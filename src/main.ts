@@ -5,6 +5,7 @@
 
 import { Loop } from "./core/loop";
 import { Input } from "./core/input";
+import { Audio } from "./core/audio";
 import { createGameState } from "./state/gameState";
 import { Renderer } from "./views/renderer";
 import { PerfOverlay } from "./views/perfOverlay";
@@ -69,10 +70,12 @@ async function main(): Promise<void> {
   const input = new Input();
   input.attach();
 
+  const audio = new Audio();
+
   // Debug keys (edge-triggered; key-repeat ignored):
   //   R  restart (when dead/won)    L  toggle god mode (no contact damage)
   //   K  toggle XP leveling         ]  +1 level (opens upgrade menu)
-  //   [  -1 level                   B  spawn the boss now
+  //   [  -1 level                   B  spawn the boss now    M  mute
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyR" && (state.gameOver || state.won)) {
       state = createGameState(SEED);
@@ -81,6 +84,8 @@ async function main(): Promise<void> {
     } else if (e.code === "KeyL" && !e.repeat) {
       state.godMode = !state.godMode;
       console.log("god mode:", state.godMode ? "ON" : "OFF");
+    } else if (e.code === "KeyM" && !e.repeat) {
+      console.log("muted:", audio.toggleMute());
     } else if (e.code === "KeyK" && !e.repeat) {
       state.levelingEnabled = !state.levelingEnabled;
       console.log("leveling:", state.levelingEnabled ? "ON" : "OFF");
@@ -137,6 +142,7 @@ async function main(): Promise<void> {
       renderer.render(state, alpha);
       overlay.update(loop, 1 / 60, state.enemies.count);
       hud.update(state, 1 / 60);
+      audio.update(state, 1 / 60);
       // Open the upgrade menu for each queued level-up (sim is paused meanwhile).
       if (!state.gameOver && state.levelUpsPending > 0 && !upgradeMenu.isOpen()) {
         upgradeMenu.show(rollUpgrades(state.rng, 3));
