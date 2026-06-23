@@ -6,13 +6,29 @@
 
 Get **2,000+ enemies on screen at frame budget** with the Dagger loop feeling good *before* adding a second weapon. Prove the swarm, then prove the fun, then expand. Do not build content on top of a backbone that hasn't hit the entity-count target.
 
+## Status — shipped ✅
+
+swarmr is a complete, winnable, deployed game: **https://brac.github.io/swarmr/**
+
+The north star held — 2,000 enemies at frame budget with a flat heap throughout (logic ~1–2ms, render <1ms). Built well past the original slice:
+
+- **Weapons (4):** Dagger, Whip, Garlic, **Axe**. The Axe (a gravity projectile lobbed up that arcs back through the swarm with infinite pierce) replaced the planned **Holy Water** as weapon 4 — same "each weapon forces a new system" rationale, swapped by the designer mid-build. Holy Water (lobbed delayed-AOE) is the one planned weapon not built; clean future addition.
+- **Stakes:** player HP, i-frame contact damage, death + restart.
+- **Progression:** XP gems → leveling → a pause-and-choose upgrade menu (12 upgrades that mutate per-run `state.weapons` / `state.player`).
+- **Variety + ramp:** 3 enemy types (grunt / runner / tank) phased in over time; enemy HP scales with elapsed time.
+- **Ending:** a 10-minute survival goal with a boss finale + victory screen.
+- **Presentation:** juice (hit flash → scale-punch, crits, ±variance), Howler audio (synthesized SFX), title + pause screens, and a pixel-art sprite pass over the grey-box.
+- **Deploy:** GitHub Pages via Actions on push to `main` (Vite `base: '/swarmr/'`).
+
+The sections below are the original design intent; where reality diverged it's noted inline.
+
 ## Tech stack
 
-- **Renderer:** PixiJS v8 (WebGL, WebGPU when available). No engine. No Godot.
+- **Renderer:** PixiJS v8 — pinned to **WebGL** (`preference: "webgl"`; WebGPU + the experimental `ParticleContainer` was unverified). No engine. No Godot.
 - **Language:** TypeScript, strict.
-- **Build:** Vite.
-- **Audio:** Howler.js (defer until after the slice works).
-- **Deploy:** Cloudflare Pages or DigitalOcean + Caddy.
+- **Build:** Vite 6.
+- **Audio:** Howler.js (deferred until after the slice; ✅ done — synthesized SFX via `scripts/gen-sounds.mjs`).
+- **Deploy:** ✅ GitHub Pages via `.github/workflows/deploy.yml` (auto-deploys on push to `main`). Static `dist/` — also hostable on Cloudflare Pages / any static server.
 
 ## Architecture (canonical — mirrors HyperBrick)
 
@@ -29,19 +45,24 @@ These are not "later" optimizations. They are load-bearing from enemy #1.
 
 1. **Spatial hash from day one.** Uniform grid broadphase. Naive O(n²) collision is forbidden even as a stopgap — the whole architecture (weapon targeting, enemy neighbor queries, collision) is shaped by how things query the grid. Stub it in with the first enemy. ~80 lines. This is the difference between 300 enemies and 5,000.
 2. **Pool everything that spawns in bulk.** Projectiles, enemies, XP gems, damage numbers. Zero per-frame allocation in the hot path. GC pauses are the enemy of a swarm game. Acquire/release, never `new` in the loop.
-3. **Batch the draw.** One texture atlas. `ParticleContainer` (or v8's optimized batched container) for the enemy swarm. Damage numbers via **bitmap font**, never `Text` objects — `Text` allocates a texture per object and will tank you at swarm scale.
+3. **Batch the draw.** One texture atlas. `ParticleContainer` for the swarm (one per enemy type — single texture each — routed by type). Damage numbers: **pooled digit sprites** composed from a pre-rendered digit atlas. ⚠️ The original plan said "bitmap font, never `Text`" — but **`BitmapText` *also* allocates**: setting `.text` re-runs `getBitmapTextLayout()` (a fresh layout object + arrays) every change, which sawtooths the heap at swarm throughput. Digit sprites have zero per-change allocation. See `docs/04-pooling-rendering.md`.
 
 ## Build order (do not reorder)
 
 Each weapon is added because it forces a *new system* to exist. The order is the lesson plan.
 
-1. **Vertical slice (this doc's whole focus):** Player + one flocking enemy type + spatial hash + Dagger (pooled projectiles) + collision + pooled damage numbers + flat map with a few static colliders. See `docs/01-vertical-slice.md`.
-2. **Dagger** — nearest/facing-target projectile. Builds the entire combat backbone: pool, spatial query, collision, damage number. See `docs/02-dagger.md`.
-3. **Whip** — fixed-arc hitbox, no projectile. Forces a non-projectile area-overlap damage source. Cheap once Dagger collision exists.
-4. **Garlic** — persistent player aura. Forces tick-based DoT cadence + per-enemy re-hit cooldown. This teaches the "damage cooldown per entity" pattern reused everywhere.
-5. **Holy Water** — lobbed projectile that lands and leaves a timed ground AOE. Delayed projectile + spawned persistent zone. Most complex; last.
+1. ✅ **Vertical slice:** Player + one flocking enemy type + spatial hash + Dagger (pooled projectiles) + collision + pooled damage numbers. (Static-collider map skipped — low value, doesn't force a new system.) See `docs/01-vertical-slice.md`.
+2. ✅ **Dagger** — nearest-target projectile. Builds the entire combat backbone: pool, spatial query, collision, damage number. See `docs/02-dagger.md`.
+3. ✅ **Whip** — fixed-arc hitbox, no projectile. Forces a non-projectile area-overlap damage source. Cheap once Dagger collision exists.
+4. ✅ **Garlic** — persistent player aura. Forces a per-enemy re-hit cooldown (absolute next-eligible timestamp per enemy — no per-tick decrement pass). The "damage cooldown per entity" pattern, reused by the boss's per-source gates.
+5. ✅ **Axe** (replaced Holy Water) — a **gravity projectile**: rides the existing projectile pool with a per-projectile `gravity` term + `kind` tag, launched up, arcs through the swarm with infinite pierce. A per-enemy projectile re-hit gate stops a dwelling axe from melting one body.
+6. ⬜ **Holy Water** (not built) — lobbed delayed-AOE. The remaining planned weapon.
 
-Gate: weapon N+1 does not start until weapon N feels good and the entity-count target still holds.
+Gate: weapon N+1 does not start until weapon N feels good and the entity-count target still holds. (Held throughout.)
+
+### Post-weapon phases (all ✅)
+
+Progression (XP gems → leveling → upgrades) · enemy variety + time-based difficulty ramp · 10-minute boss + win condition · audio · title/pause screens · sprite art pass · GitHub Pages deploy. Each was its own commit ("Phase N …" in the git log).
 
 ## Performance budget
 
@@ -52,35 +73,38 @@ Gate: weapon N+1 does not start until weapon N feels good and the entity-count t
 
 ## Directory layout
 
+As-built (the spec's plan, grown):
+
 ```
 swarmr/
   src/
-    main.ts            # bootstrap, Pixi app, loop
+    main.ts            # bootstrap, loop, app lifecycle (title/pause/restart), keybinds
     core/
       loop.ts          # fixed-timestep accumulator
       rng.ts           # mulberry32
-      pool.ts          # generic object pool
-      spatialHash.ts   # uniform grid broadphase
-    state/
-      gameState.ts     # the single mutable world
-    systems/
-      movement.ts
-      spawn.ts
-      weapons/
-        dagger.ts
-      collision.ts
-      damageNumbers.ts
-    views/
-      renderer.ts      # reads GameState, draws. dumb.
-    data/
-      weapons.ts       # tunables
-      enemies.ts
-      waves.ts
-  docs/
-    01-vertical-slice.md
-    02-dagger.md
-    03-spatial-hash.md
-    04-pooling.md
+      spatialHash.ts   # uniform-grid broadphase (flat counting sort)
+      input.ts         # keyboard
+      audio.ts         # Howler observer — plays SFX on GameState edges
+      pool.ts          # generic pool (entities use SoA pools instead)
+    state/             # the world: gameState + SoA pools
+      gameState.ts  enemies.ts  projectiles.ts  gems.ts  damageNumbers.ts
+      whipStrikes.ts  weapons.ts (mutable per-run stats)
+    systems/           # pure update logic
+      movement.ts  spawn.ts  broadphase.ts  contactDamage.ts  collision.ts
+      combat.ts (rollHit)  targeting.ts  gems.ts  upgrades.ts  boss.ts
+      damageNumbers.ts  projectiles.ts
+      weapons/         dagger.ts  whip.ts  garlic.ts  axe.ts
+    views/             # dumb — read GameState, draw
+      renderer.ts (Pixi)  hud.ts (DOM)  upgradeMenu.ts  perfOverlay.ts
+    data/              # ALL tunables
+      weapons.ts  enemies.ts  waves.ts  xp.ts  boss.ts  player.ts  combat.ts
+    vite-env.d.ts
+  public/
+    sounds/*.wav       # synthesized SFX (gen-sounds.mjs output)
+    assets/            # Kenney-style sprite atlas (tilemap_packed.png + tiles)
+  scripts/gen-sounds.mjs
+  .github/workflows/deploy.yml
+  docs/  README.md  vite.config.ts
 ```
 
 ## Naming
@@ -90,8 +114,11 @@ Lowercase project name (`swarmr`), consistent with burnRat / herdr / bracSprite.
 ## What NOT to do
 
 - Don't add a second weapon before the slice hits target.
-- Don't use `Text` for damage numbers.
-- Don't `new` anything in the loop.
+- Don't use `Text` **or per-change `BitmapText`** for damage numbers — both allocate per object/change. Compose from pooled digit sprites.
+- Don't set `particle.tint` on the swarm each frame — its setter allocates (`Color.shared.setValue`). Write `particle.color` directly with bit-packed BGRA. (And `scale` lives in the static `vertex` buffer, `tint` in `color` — enable them in `dynamicProperties` to animate.)
+- Don't `new` anything in the loop. Reset scratch arrays with `length = 0`; avoid `for…of` in hot paths (iterator alloc).
 - Don't write naive collision "just to start."
+- Don't put a too-big entity (the boss) in the uniform hash — it's bigger than a cell and breaks grid queries. Handle it outside the pool with direct overlap checks.
 - Don't reach for Godot. The genre doesn't need it and you'd lose your whole Pixi architecture investment.
-- Don't add juice/art/audio until the swarm holds frame budget. Prove it grey-box first.
+- Don't add juice/art/audio until the swarm holds frame budget. Prove it grey-box first. (Done in that order.)
+- Don't run `npm run dev` — the designer runs the dev server. Commit/push only when asked.
