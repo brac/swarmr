@@ -7,7 +7,6 @@
 // before collision compacts the dead, so every queried index is in range.
 
 import type { GameState } from "../state/gameState";
-import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
 
 const candidates: number[] = []; // reused scratch — never per-call alloc
@@ -34,9 +33,9 @@ export function updateContact(state: GameState, dt: number): void {
     const ei = candidates[k]!;
     const dx = e.posX[ei]! - p.pos.x;
     const dy = e.posY[ei]! - p.pos.y;
-    const rr = p.radius + e.radius;
+    const rr = p.radius + e.radius[ei]!;
     if (dx * dx + dy * dy <= rr * rr) {
-      p.hp -= ENEMY.contactDamage;
+      p.hp -= e.contactDamage[ei]!;
       p.invuln = PLAYER.invulnTime;
       if (p.hp <= 0) {
         p.hp = 0;

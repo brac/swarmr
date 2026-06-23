@@ -33,17 +33,35 @@ export function updateGems(state: GameState, dt: number): void {
   }
 }
 
-// Add XP and resolve any level-ups (carrying overflow). Each level queues an
-// upgrade choice (which pauses the sim) and fires the level-up flash. Multiple
-// levels from one big haul queue multiple choices, resolved one at a time.
+// Add XP and resolve any level-ups (carrying overflow). Disabled by the debug
+// leveling toggle. Each level queues an upgrade choice (pausing the sim) and
+// fires the flash; multiple levels from one haul queue and resolve one at a time.
 function addXp(state: GameState, amount: number): void {
+  if (!state.levelingEnabled) return;
   const p = state.player;
   p.xp += amount;
   while (p.xp >= p.xpToNext) {
     p.xp -= p.xpToNext;
-    p.level++;
-    p.xpToNext = xpToNext(p.level);
-    state.levelUpsPending++;
-    state.levelUpTimer = LEVEL.upFlashTime;
+    levelUp(state);
   }
+}
+
+// One level up: advance, raise the curve, queue an upgrade choice + flash. Also
+// the debug "+level" path, so it works even when XP leveling is toggled off.
+export function levelUp(state: GameState): void {
+  const p = state.player;
+  p.level++;
+  p.xpToNext = xpToNext(p.level);
+  state.levelUpsPending++;
+  state.levelUpTimer = LEVEL.upFlashTime;
+}
+
+// Debug "-level": step back one level (never below 1) and reset the curve. Can't
+// un-apply already-chosen upgrades — it only adjusts the level/XP bookkeeping.
+export function levelDown(state: GameState): void {
+  const p = state.player;
+  if (p.level <= 1) return;
+  p.level--;
+  p.xpToNext = xpToNext(p.level);
+  if (p.xp >= p.xpToNext) p.xp = 0;
 }

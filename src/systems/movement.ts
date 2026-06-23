@@ -34,7 +34,7 @@ export function updateEnemies(state: GameState, dt: number): void {
   const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
-  const speed = e.speed;
+  const speeds = e.speed;
   const sepR2 = ENEMY.sepRadius * ENEMY.sepRadius;
   const sepStrength = ENEMY.sepStrength;
   const n = e.count;
@@ -58,12 +58,12 @@ export function updateEnemies(state: GameState, dt: number): void {
     const ht = hitTimer[i]!;
     if (ht > 0) hitTimer[i] = ht > dt ? ht - dt : 0;
 
-    // Seek the player as a unit vector × speed.
+    // Seek the player as a unit vector × this enemy's speed.
     let vx = px - ex;
     let vy = py - ey;
     const d2 = vx * vx + vy * vy;
     if (d2 > 1e-6) {
-      const inv = speed / Math.sqrt(d2);
+      const inv = speeds[i]! / Math.sqrt(d2);
       vx *= inv;
       vy *= inv;
     } else {

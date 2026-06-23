@@ -1,15 +1,21 @@
 // Spawn system. Ramps the swarm to the target count by emitting enemies at a
-// random screen edge each tick. All randomness goes through the seeded RNG.
+// random screen edge each tick. The enemy *type* and an HP scale are chosen from
+// the difficulty curve (which keys off elapsed sim time), so the run gets harder:
+// tougher types phase in and every enemy gets beefier. All randomness is seeded.
 
 import type { GameState } from "../state/gameState";
+import type { Rng } from "../core/rng";
 import { WORLD_W, WORLD_H } from "../state/gameState";
-import { SPAWN } from "../data/waves";
+import { SPAWN, DIFFICULTY } from "../data/waves";
 
 export function updateSpawn(state: GameState): void {
   const e = state.enemies;
   if (e.count >= SPAWN.targetCount) return;
 
   const rng = state.rng;
+  const time = state.time;
+  const hpScale = 1 + (time / 60) * DIFFICULTY.hpRampPerMin;
+
   for (let n = 0; n < SPAWN.perTick && e.count < SPAWN.targetCount; n++) {
     // Pick an edge, then a random point along it.
     const edge = rng.int(0, 4);
@@ -33,6 +39,26 @@ export function updateSpawn(state: GameState): void {
         y = rng.range(0, WORLD_H);
         break;
     }
-    e.spawn(x, y);
+    e.spawn(x, y, pickType(rng, time), hpScale);
   }
+}
+
+// Weighted-random enemy type from the latest difficulty tier reached. Index loops
+// only — runs up to perTick× per tick, so it stays allocation-free.
+function pickType(rng: Rng, time: number): number {
+  const tiers = DIFFICULTY.tiers;
+  let w: readonly number[] = tiers[0]!.w;
+  for (let i = 1; i < tiers.length; i++) {
+    if (time >= tiers[i]!.t) w = tiers[i]!.w;
+    else break;
+  }
+
+  let total = 0;
+  for (let i = 0; i < w.length; i++) total += w[i]!;
+  let r = rng.next() * total;
+  for (let i = 0; i < w.length; i++) {
+    r -= w[i]!;
+    if (r <= 0) return i;
+  }
+  return 0;
 }

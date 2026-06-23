@@ -59,7 +59,7 @@ export function updateWhip(state: GameState, dt: number): void {
   const posY = e.posY;
   const hp = e.hp;
   const hitTimer = e.hitTimer;
-  const radius = e.radius;
+  const radius = e.radius; // per-enemy radius array
   const cellStart = h.cellStart;
   const items = h.items;
   const gridW = h.gridW;
@@ -85,7 +85,7 @@ export function updateWhip(state: GameState, dt: number): void {
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(
           posX[j]!,
-          posY[j]! - radius,
+          posY[j]! - radius[j]!,
           roll.amount,
           roll.crit ? 1 : 0,
         );

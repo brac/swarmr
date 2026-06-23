@@ -37,7 +37,7 @@ export function updateGarlic(state: GameState): void {
   const hp = e.hp;
   const hitTimer = e.hitTimer;
   const nextHit = e.garlicNextHit;
-  const radius = e.radius;
+  const radius = e.radius; // per-enemy radius array
   const cellStart = h.cellStart;
   const items = h.items;
   const gridW = h.gridW;
@@ -60,7 +60,7 @@ export function updateGarlic(state: GameState): void {
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(
           posX[j]!,
-          posY[j]! - radius,
+          posY[j]! - radius[j]!,
           roll.amount,
           roll.crit ? 1 : 0,
         );

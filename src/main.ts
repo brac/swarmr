@@ -11,6 +11,7 @@ import { PerfOverlay } from "./views/perfOverlay";
 import { Hud } from "./views/hud";
 import { UpgradeMenu } from "./views/upgradeMenu";
 import { rollUpgrades } from "./systems/upgrades";
+import { levelUp, levelDown } from "./systems/gems";
 import { updateSpawn } from "./systems/spawn";
 import { updatePlayer, updateEnemies } from "./systems/movement";
 import { rebuildHash } from "./systems/broadphase";
@@ -55,15 +56,22 @@ async function main(): Promise<void> {
   const input = new Input();
   input.attach();
 
-  // Restart on R once dead. keydown is edge-triggered; after the swap gameOver is
-  // false, so key-repeat events are no-ops until the next death.
-  // Debug: L toggles god mode (ignore contact damage), e.g. to test weapons in
-  // the swarm without dying.
+  // Debug keys (edge-triggered; key-repeat ignored):
+  //   R  restart (when dead)        L  toggle god mode (no contact damage)
+  //   K  toggle XP leveling         ]  +1 level (opens upgrade menu)
+  //   [  -1 level
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyR" && state.gameOver) state = createGameState(SEED);
     else if (e.code === "KeyL" && !e.repeat) {
       state.godMode = !state.godMode;
       console.log("god mode:", state.godMode ? "ON" : "OFF");
+    } else if (e.code === "KeyK" && !e.repeat) {
+      state.levelingEnabled = !state.levelingEnabled;
+      console.log("leveling:", state.levelingEnabled ? "ON" : "OFF");
+    } else if (e.code === "BracketRight" && !e.repeat && !state.gameOver) {
+      levelUp(state); // manual +level → upgrade menu, even if leveling is off
+    } else if (e.code === "BracketLeft" && !e.repeat && !state.gameOver) {
+      levelDown(state);
     }
   });
 

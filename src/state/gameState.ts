@@ -24,7 +24,7 @@ export const WORLD_H = 1080;
 
 // 2x the enemy collision radius is a reasonable starting cell size
 // (see docs/03-spatial-hash.md). Tunable; profile once enemies exist.
-const HASH_CELL_SIZE = ENEMY.radius * 2;
+const HASH_CELL_SIZE = ENEMY.baseRadius * 2;
 
 export interface Vec2 {
   x: number;
@@ -62,6 +62,7 @@ export interface GameState {
   weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
   levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
+  levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
   godMode: boolean; // debug: ignore contact damage (toggle with L)
 }
@@ -96,6 +97,7 @@ export function createGameState(seed: number): GameState {
     weapons: createWeaponState(),
     levelUpTimer: 0,
     levelUpsPending: 0,
+    levelingEnabled: true,
     gameOver: false,
     godMode: false,
   };

@@ -18,6 +18,7 @@ import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { DAGGER, WHIP, GARLIC } from "../data/weapons";
 import { XP, LEVEL } from "../data/xp";
+import type { Enemies } from "../state/enemies";
 import type { Projectiles } from "../state/projectiles";
 import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
 import type { DamageNumbers } from "../state/damageNumbers";
@@ -161,15 +162,16 @@ export class Renderer {
     // Grey-box textures: white circles tinted per particle. One shared base
     // texture per layer = one batch. Real art swaps these for atlas frames later.
     const enemyTex: Texture = this.app.renderer.generateTexture(
-      new Graphics().circle(0, 0, ENEMY.radius).fill(0xffffff),
+      new Graphics().circle(0, 0, ENEMY.baseRadius).fill(0xffffff),
     );
     const projTex: Texture = this.app.renderer.generateTexture(
       new Graphics().circle(0, 0, DAGGER.projectileRadius).fill(0xffffff),
     );
 
-    // Enemy pool: color + vertex dynamic so each enemy can flash and scale-punch
-    // on hit (position is always dynamic). Base tint comes from data.
-    const enemy = this.buildParticlePool(enemyTex, ENEMY.color, ENEMY.capacity, {
+    // Enemy pool: color + vertex dynamic so each enemy can carry its type's tint,
+    // flash on hit, and scale to its type's radius (position is always dynamic).
+    // The baked tint is a placeholder — syncEnemies sets per-enemy color each frame.
+    const enemy = this.buildParticlePool(enemyTex, 0xffffff, ENEMY.capacity, {
       position: true,
       color: true,
       vertex: true,
@@ -303,7 +305,7 @@ export class Renderer {
     this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
 
     const e = state.enemies;
-    this.enemyHigh = this.syncEnemies(e.count, e.posX, e.posY, e.hitTimer);
+    this.enemyHigh = this.syncEnemies(e);
 
     this.syncProjectiles(state.projectiles);
 
@@ -394,20 +396,20 @@ export class Renderer {
   }
 
   /**
-   * Sync the swarm particles: position always, plus hit-react flash (tint lerps
-   * from the flash color back to base) and a scale punch, both driven by each
-   * enemy's hitTimer. Parks the rest off-screen. Returns the new high-water mark.
+   * Sync the swarm particles: position, each enemy's type tint (the hit-flash
+   * lerps off it), and a scale = type-radius/base-radius × the hit-react punch.
+   * Parks the rest off-screen. Returns the new high-water mark.
    */
-  private syncEnemies(
-    count: number,
-    posX: Float32Array,
-    posY: Float32Array,
-    hitTimer: Float32Array,
-  ): number {
+  private syncEnemies(e: Enemies): number {
     const particles = this.enemyParticles;
-    const base = ENEMY.color;
+    const count = e.count;
+    const posX = e.posX;
+    const posY = e.posY;
+    const hitTimer = e.hitTimer;
+    const radius = e.radius;
+    const color = e.color;
     const flash = ENEMY.hitFlashColor;
-    const basePacked = packParticleColor(base); // precompute the no-flash color once
+    const baseR = ENEMY.baseRadius;
     const reactInv = 1 / ENEMY.hitReactTime;
     const wobble = ENEMY.hitWobble;
 
@@ -415,17 +417,18 @@ export class Renderer {
       const p = particles[i]!;
       p.x = posX[i]!;
       p.y = posY[i]!;
+      const sizeScale = radius[i]! / baseR; // texture is baked at baseR
       const ht = hitTimer[i]!;
       if (ht > 0) {
         const t = ht * reactInv; // 1 at impact → 0 as it decays
-        p.color = lerpParticleColor(base, flash, t);
-        const s = 1 + wobble * t;
+        p.color = lerpParticleColor(color[i]!, flash, t);
+        const s = sizeScale * (1 + wobble * t);
         p.scaleX = s;
         p.scaleY = s;
       } else {
-        p.color = basePacked;
-        p.scaleX = 1;
-        p.scaleY = 1;
+        p.color = packParticleColor(color[i]!);
+        p.scaleX = sizeScale;
+        p.scaleY = sizeScale;
       }
     }
     for (let i = count; i < this.enemyHigh; i++) {

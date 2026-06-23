@@ -9,7 +9,6 @@
 import type { GameState } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { COMBAT } from "../data/combat";
-import { XP } from "../data/xp";
 import { PIERCE_INFINITE } from "../state/projectiles";
 import { rollHit } from "./combat";
 
@@ -36,7 +35,7 @@ export function updateCollision(state: GameState): void {
 
       const dx = e.posX[ei]! - px;
       const dy = e.posY[ei]! - py;
-      const rr = pr + e.radius;
+      const rr = pr + e.radius[ei]!;
       if (dx * dx + dy * dy > rr * rr) continue;
 
       // Hit: roll variance + crit, apply, flash, pop a number.
@@ -46,7 +45,7 @@ export function updateCollision(state: GameState): void {
       e.projHitUntil[ei] = now + COMBAT.projectileRehitGap;
       state.damageNumbers.spawn(
         e.posX[ei]!,
-        e.posY[ei]! - e.radius,
+        e.posY[ei]! - e.radius[ei]!,
         roll.amount,
         roll.crit ? 1 : 0,
       );
@@ -64,7 +63,7 @@ export function updateCollision(state: GameState): void {
   // death (from any weapon — they all funnel HP through here) drops an XP gem.
   for (let i = e.count - 1; i >= 0; i--) {
     if (e.hp[i]! <= 0) {
-      state.gems.spawn(e.posX[i]!, e.posY[i]!, XP.gemValue);
+      state.gems.spawn(e.posX[i]!, e.posY[i]!, e.xpValue[i]!);
       e.kill(i);
     }
   }

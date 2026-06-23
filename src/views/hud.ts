@@ -18,6 +18,7 @@ export class Hud {
   private lastHp = NaN;
   private lastXpPct = NaN;
   private lastLevel = -1;
+  private lastLeveling = true;
   private lastGameOver = false;
 
   constructor(
@@ -54,9 +55,12 @@ export class Hud {
       this.lastXpPct = xpPct;
     }
 
-    if (p.level !== this.lastLevel) {
-      this.levelText.textContent = "LV " + p.level;
+    if (p.level !== this.lastLevel || state.levelingEnabled !== this.lastLeveling) {
+      // " ❄" marks leveling frozen by the debug toggle.
+      this.levelText.textContent =
+        "LV " + p.level + (state.levelingEnabled ? "" : " ❄");
       this.lastLevel = p.level;
+      this.lastLeveling = state.levelingEnabled;
     }
 
     if (state.gameOver !== this.lastGameOver) {
