@@ -3,10 +3,10 @@
 
 export const XP = {
   gemValue: 1, // XP granted per gem
-  gemRadius: 9, // gem visual radius (px)
-  pickupRadius: 30, // collected when the player is this close (px)
-  magnetRadius: 240, // gems within this range home toward the player (px)
-  magnetSpeed: 620, // homing speed (px/s)
+  gemRadius: 11, // gem visual radius (px)
+  pickupRadius: 34, // collected when the player is this close (px)
+  magnetRadius: 105, // gems within this range home in; smaller → gems pile up first
+  magnetSpeed: 640, // homing speed (px/s)
   capacity: 2048, // pooled gem ceiling
 } as const;
 

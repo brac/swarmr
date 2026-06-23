@@ -5,18 +5,22 @@
 
 import {
   Application,
+  Assets,
   Container,
   Graphics,
   Particle,
   ParticleContainer,
+  Rectangle,
   Sprite,
+  Texture,
+  TilingSprite,
   Text,
 } from "pixi.js";
-import type { Texture } from "pixi.js";
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
-import { DAGGER, WHIP, GARLIC } from "../data/weapons";
+import { PLAYER } from "../data/player";
+import { DAGGER, WHIP, GARLIC, AXE } from "../data/weapons";
 import { XP, LEVEL } from "../data/xp";
 import { BOSS } from "../data/boss";
 import type { Enemies } from "../state/enemies";
@@ -37,48 +41,42 @@ const DN_MAX_DIGITS = 4; // up to 9999 per number; caps the digit-sprite pool si
 // Reused scratch for extracting a number's digits (least-significant first).
 const digitScratch = new Int32Array(DN_MAX_DIGITS);
 
-/**
- * Pack an 0xRRGGBB color (with full alpha) into Particle.color's wire format:
- * 0xAABBGGRR. We write `particle.color` directly rather than `particle.tint`,
- * because the tint setter runs Color.shared.setValue() — which allocates, and at
- * 2,000 enemies × 60fps that churn is what turns the heap into a sawtooth.
- */
-function packParticleColor(rgb: number): number {
-  const r = (rgb >> 16) & 0xff;
-  const g = (rgb >> 8) & 0xff;
-  const b = rgb & 0xff;
-  return (0xff << 24) | (b << 16) | (g << 8) | r;
-}
+// Sprite atlas (Kenney-style tilemap): 16px tiles, 12 columns, no gaps. Tile
+// indices for the things we draw. Enemy frames are ordered by ENEMY_TYPES index.
+const TILE = 16;
+const ATLAS_COLS = 12;
+const TILEMAP = "assets/Tilemap/tilemap_packed.png";
+const FLOOR_TILE = "assets/Tiles/tile_0048.png"; // standalone (no atlas-seam bleed)
+const T_PLAYER = 98;
+const T_ENEMY = [108, 122, 109]; // grunt=slime, runner=spider, tank=orc
+const T_BOSS = 121; // skull-wraith
+const T_DAGGER = 103;
+const T_AXE = 118;
 
-/**
- * Lerp two 0xRRGGBB colors and return the result already packed for
- * Particle.color (0xAABBGGRR, full alpha). t=0 → a, t=1 → b. Allocation-free.
- */
-function lerpParticleColor(a: number, b: number, t: number): number {
-  const ar = (a >> 16) & 0xff;
-  const ag = (a >> 8) & 0xff;
-  const ab = a & 0xff;
-  const r = (ar + (((b >> 16) & 0xff) - ar) * t) | 0;
-  const g = (ag + (((b >> 8) & 0xff) - ag) * t) | 0;
-  const bl = (ab + ((b & 0xff) - ab) * t) | 0;
-  return (0xff << 24) | (bl << 16) | (g << 8) | r;
-}
+// A 16px sprite covers ~3.2× the entity radius (overhang beyond the hitbox reads
+// better — characters look chunkier than their collision circle).
+const SPRITE_PER_RADIUS = 3.2 / TILE;
+// The dagger art points up; rotate it from that to its travel direction.
+const DAGGER_SPRITE_OFFSET = Math.PI / 2;
+const FLOOR_TILE_SCALE = 3; // 16px floor tile → 48px on the world grid
+const FLOOR_TINT = 0x363c47; // dark slate; multiplies the bright floor tile down
 
 export class Renderer {
   readonly app = new Application();
   /** Everything in world space lives under here; we scale/position it to fit. */
   private world = new Container();
-  private playerDot = new Graphics();
+  private playerSprite = new Sprite();
   private garlicAura = new Graphics(); // persistent damage aura around the player
   private shownGod = false; // last-applied god-mode tint state (gate the tint write)
 
-  // Swarm layer: one batched container, one shared texture, a fixed pool of
-  // particles. Scale lives in the (static) vertex property, so it's baked once
-  // at full size; only `position` is dynamic. Active enemies (packed in
-  // [0,count)) get real positions; inactive ones are parked off-screen.
-  private enemyContainer!: ParticleContainer;
-  private enemyParticles: Particle[] = [];
-  private enemyHigh = 0; // high-water count, to know how many to park off-screen
+  // Swarm: one batched ParticleContainer per enemy type (each its own sprite
+  // texture), routed by type in syncEnemies. Position + scale (vertex) are
+  // dynamic so each enemy sizes to its radius and scale-punches on hit.
+  private enemyPools: {
+    container: ParticleContainer;
+    particles: Particle[];
+    high: number;
+  }[] = [];
 
   // Projectile (Dagger) layer: same pooled-particle pattern, its own texture/tint.
   private projContainer!: ParticleContainer;
@@ -99,8 +97,8 @@ export class Renderer {
   // Level-up ring: one Graphics drawn once, expanded + faded over the flash.
   private levelUpRing = new Graphics();
 
-  // Boss: one big Graphics (white fill so its tint carries the color + hit-flash).
-  private bossGraphic = new Graphics();
+  // Boss: a big scaled sprite, tinted crimson and flashed toward white on hit.
+  private bossSprite = new Sprite();
 
   // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
   // aim (pointing +x). Per active strike we set position/rotation/alpha — no
@@ -135,25 +133,31 @@ export class Renderer {
     });
     parent.appendChild(this.app.canvas);
 
-    // Static world backdrop: bounds border + center crosshair. Proves the
-    // letterbox transform maps world coords correctly. Removed once real art
-    // exists; cheap to keep as a debug frame for now.
-    const frame = new Graphics();
-    frame
-      .rect(0, 0, WORLD_W, WORLD_H)
-      .fill(0x12151d)
-      .rect(0, 0, WORLD_W, WORLD_H)
-      .stroke({ width: 2, color: 0x2a3142 });
-    const cx = WORLD_W / 2;
-    const cy = WORLD_H / 2;
-    frame
-      .moveTo(cx - 20, cy)
-      .lineTo(cx + 20, cy)
-      .moveTo(cx, cy - 20)
-      .lineTo(cx, cy + 20)
-      .stroke({ width: 1, color: 0x2a3142 });
+    // Load the sprite atlas + a standalone floor tile; nearest keeps pixels crisp.
+    const base = import.meta.env.BASE_URL;
+    const atlas = await Assets.load<Texture>(base + TILEMAP);
+    const floorTex = await Assets.load<Texture>(base + FLOOR_TILE);
+    atlas.source.scaleMode = "nearest";
+    floorTex.source.scaleMode = "nearest";
 
-    this.playerDot.circle(0, 0, 16).fill(0x8fff8f);
+    // Tiled floor across the whole world. A standalone texture (not an atlas
+    // frame) so TilingSprite can't bleed neighbouring tiles at the seams.
+    const floor = new TilingSprite({
+      texture: floorTex,
+      width: WORLD_W,
+      height: WORLD_H,
+    });
+    floor.tileScale.set(FLOOR_TILE_SCALE);
+    floor.tint = FLOOR_TINT; // darken the bright tile into a moody dungeon floor
+    // A thin border just frames the play field.
+    const border = new Graphics()
+      .rect(0, 0, WORLD_W, WORLD_H)
+      .stroke({ width: 3, color: 0x0a0c10, alpha: 0.8 });
+
+    // Player sprite.
+    this.playerSprite.texture = this.tile(atlas, T_PLAYER);
+    this.playerSprite.anchor.set(0.5);
+    this.playerSprite.scale.set(PLAYER.radius * SPRITE_PER_RADIUS);
 
     // Garlic aura: a faint greenish disc with a soft ring, drawn once at origin
     // and moved to the player each frame. Alpha pulses gently for an "aura" feel.
@@ -163,38 +167,37 @@ export class Renderer {
       .circle(0, 0, GARLIC.radius)
       .stroke({ width: 2, color: 0x88ff88, alpha: 0.25 });
 
-    // Grey-box textures: white circles tinted per particle. One shared base
-    // texture per layer = one batch. Real art swaps these for atlas frames later.
-    const enemyTex: Texture = this.app.renderer.generateTexture(
-      new Graphics().circle(0, 0, ENEMY.baseRadius).fill(0xffffff),
-    );
-    const projTex: Texture = this.app.renderer.generateTexture(
-      new Graphics().circle(0, 0, DAGGER.projectileRadius).fill(0xffffff),
-    );
+    // One batched particle pool per enemy type (each its own sprite). Scale is
+    // dynamic (vertex) so each enemy sizes to its radius and punches on hit.
+    for (let t = 0; t < T_ENEMY.length; t++) {
+      const pool = this.buildParticlePool(
+        this.tile(atlas, T_ENEMY[t]!),
+        0xffffff,
+        ENEMY.capacity,
+        { position: true, vertex: true },
+      );
+      this.enemyPools.push({ ...pool, high: 0 });
+    }
 
-    // Enemy pool: color + vertex dynamic so each enemy can carry its type's tint,
-    // flash on hit, and scale to its type's radius (position is always dynamic).
-    // The baked tint is a placeholder — syncEnemies sets per-enemy color each frame.
-    const enemy = this.buildParticlePool(enemyTex, 0xffffff, ENEMY.capacity, {
-      position: true,
-      color: true,
-      vertex: true,
-    });
-    this.enemyContainer = enemy.container;
-    this.enemyParticles = enemy.particles;
-
-    const proj = this.buildParticlePool(projTex, 0xffe066, PROJECTILE_CAPACITY);
+    // Dagger projectiles: sprite that rotates to face travel (rotation dynamic).
+    const proj = this.buildParticlePool(
+      this.tile(atlas, T_DAGGER),
+      0xffffff,
+      PROJECTILE_CAPACITY,
+      { position: true, rotation: true },
+      (DAGGER.projectileRadius * 4) / TILE,
+    );
     this.projContainer = proj.container;
     this.projParticles = proj.particles;
 
-    // Axe: a steel blade (rectangle) that tumbles. Position + rotation dynamic.
-    const axeTex: Texture = this.app.renderer.generateTexture(
-      new Graphics().rect(-15, -6, 30, 12).fill(0xffffff),
+    // Axe: sprite that tumbles (rotation dynamic).
+    const axe = this.buildParticlePool(
+      this.tile(atlas, T_AXE),
+      0xffffff,
+      PROJECTILE_CAPACITY,
+      { position: true, rotation: true },
+      AXE.radius * SPRITE_PER_RADIUS,
     );
-    const axe = this.buildParticlePool(axeTex, 0xbcd6ff, PROJECTILE_CAPACITY, {
-      position: true,
-      rotation: true,
-    });
     this.axeContainer = axe.container;
     this.axeParticles = axe.particles;
 
@@ -212,14 +215,12 @@ export class Renderer {
       .stroke({ width: 4, color: 0xffd86b, alpha: 0.9 });
     this.levelUpRing.visible = false;
 
-    // Boss body: white disc + dark ring, drawn once; tinted/placed per frame.
-    this.bossGraphic
-      .circle(0, 0, BOSS.radius)
-      .fill(0xffffff)
-      .circle(0, 0, BOSS.radius)
-      .stroke({ width: 4, color: 0x1a0008, alpha: 0.6 });
-    this.bossGraphic.tint = BOSS.color;
-    this.bossGraphic.visible = false;
+    // Boss sprite: scaled big, tinted crimson; flashes toward white on hit.
+    this.bossSprite.texture = this.tile(atlas, T_BOSS);
+    this.bossSprite.anchor.set(0.5);
+    this.bossSprite.scale.set(BOSS.radius * SPRITE_PER_RADIUS);
+    this.bossSprite.tint = BOSS.color;
+    this.bossSprite.visible = false;
 
     // Pooled whip wedges. Each draws the same sector once (apex at origin,
     // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
@@ -265,17 +266,17 @@ export class Renderer {
     // Draw order: backdrop, garlic aura, swarm, whip arcs, projectiles, numbers,
     // then gems near the top so the swarm + damage-number text don't bury them,
     // player, and the level-up ring on top. The aura sits under the swarm.
+    this.world.addChild(floor, this.garlicAura);
+    for (const pool of this.enemyPools) this.world.addChild(pool.container);
     this.world.addChild(
-      frame,
-      this.garlicAura,
-      this.enemyContainer,
-      this.bossGraphic,
+      this.bossSprite,
       this.whipLayer,
       this.projContainer,
       this.axeContainer,
       this.dnLayer,
       this.gemContainer,
-      this.playerDot,
+      this.playerSprite,
+      border,
       this.levelUpRing,
     );
     this.app.stage.addChild(this.world);
@@ -302,13 +303,13 @@ export class Renderer {
   /** Read state, position views, render one frame. No decisions here. */
   render(state: GameState, _alpha: number): void {
     const p = state.player;
-    this.playerDot.position.set(p.pos.x, p.pos.y);
+    this.playerSprite.position.set(p.pos.x, p.pos.y);
     // Blink while invulnerable (i-frames) so a hit reads instantly; solid otherwise.
-    this.playerDot.alpha =
+    this.playerSprite.alpha =
       p.invuln > 0 && ((p.invuln * 20) | 0) % 2 === 0 ? 0.35 : 1;
     // God mode tints the player gold; gated so the tint setter runs only on change.
     if (state.godMode !== this.shownGod) {
-      this.playerDot.tint = state.godMode ? 0xffd700 : 0xffffff;
+      this.playerSprite.tint = state.godMode ? 0xffd700 : 0xffffff;
       this.shownGod = state.godMode;
     }
 
@@ -318,8 +319,7 @@ export class Renderer {
     this.garlicAura.scale.set(state.weapons.garlic.radius / GARLIC.radius);
     this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
 
-    const e = state.enemies;
-    this.enemyHigh = this.syncEnemies(e);
+    this.syncEnemies(state.enemies);
 
     this.syncProjectiles(state.projectiles);
 
@@ -356,8 +356,8 @@ export class Renderer {
     // Boss: place it, and flash its tint toward white on hit.
     const boss = state.boss;
     if (boss.active) {
-      this.bossGraphic.visible = true;
-      this.bossGraphic.position.set(boss.pos.x, boss.pos.y);
+      this.bossSprite.visible = true;
+      this.bossSprite.position.set(boss.pos.x, boss.pos.y);
       const ht = boss.hitTimer;
       if (ht > 0) {
         const t = ht / ENEMY.hitReactTime; // 1 at impact → 0
@@ -365,15 +365,15 @@ export class Renderer {
         const r = (c >> 16) & 0xff;
         const g = (c >> 8) & 0xff;
         const bl = c & 0xff;
-        this.bossGraphic.tint =
+        this.bossSprite.tint =
           (((r + (255 - r) * t) | 0) << 16) |
           (((g + (255 - g) * t) | 0) << 8) |
           ((bl + (255 - bl) * t) | 0);
       } else {
-        this.bossGraphic.tint = BOSS.color;
+        this.bossSprite.tint = BOSS.color;
       }
-    } else if (this.bossGraphic.visible) {
-      this.bossGraphic.visible = false;
+    } else if (this.bossSprite.visible) {
+      this.bossSprite.visible = false;
     }
 
     // Level-up ring: expand outward and fade over the flash.
@@ -392,11 +392,20 @@ export class Renderer {
     this.app.renderer.render(this.app.stage);
   }
 
+  /** A 16px tile from the atlas (12-column, gapless), as its own Texture frame. */
+  private tile(atlas: Texture, idx: number): Texture {
+    const c = idx % ATLAS_COLS;
+    const r = (idx / ATLAS_COLS) | 0;
+    return new Texture({
+      source: atlas.source,
+      frame: new Rectangle(c * TILE, r * TILE, TILE, TILE),
+    });
+  }
+
   /**
-   * Build a pooled ParticleContainer: capacity particles parked off-screen.
-   * `dynamic` picks which per-particle buffers get re-uploaded each frame. The
-   * swarm enables color + vertex (for hit-flash tint and the scale punch); the
-   * projectile pool stays position-only and leaves the rest baked once.
+   * Build a pooled ParticleContainer: capacity particles parked off-screen, all
+   * sharing one texture. `dynamic` picks which per-particle buffers re-upload
+   * each frame; `scale` bakes a static size (ignored when vertex is dynamic).
    */
   private buildParticlePool(
     tex: Texture,
@@ -408,6 +417,7 @@ export class Renderer {
       vertex?: boolean;
       rotation?: boolean;
     } = { position: true },
+    scale = 1,
   ): { container: ParticleContainer; particles: Particle[] } {
     const particles: Particle[] = [];
     for (let i = 0; i < capacity; i++) {
@@ -417,6 +427,8 @@ export class Renderer {
           tint,
           anchorX: 0.5,
           anchorY: 0.5,
+          scaleX: scale,
+          scaleY: scale,
           x: OFFSCREEN,
           y: OFFSCREEN,
         }),
@@ -433,47 +445,44 @@ export class Renderer {
   }
 
   /**
-   * Sync the swarm particles: position, each enemy's type tint (the hit-flash
-   * lerps off it), and a scale = type-radius/base-radius × the hit-react punch.
-   * Parks the rest off-screen. Returns the new high-water mark.
+   * Sync the swarm: route each enemy into its type's pool, set position and a
+   * scale = radius × sprite factor × the hit-react punch. Parks each pool's
+   * leftovers off-screen.
    */
-  private syncEnemies(e: Enemies): number {
-    const particles = this.enemyParticles;
+  private syncEnemies(e: Enemies): void {
+    const pools = this.enemyPools;
     const count = e.count;
     const posX = e.posX;
     const posY = e.posY;
     const hitTimer = e.hitTimer;
     const radius = e.radius;
-    const color = e.color;
-    const flash = ENEMY.hitFlashColor;
-    const baseR = ENEMY.baseRadius;
+    const type = e.type;
     const reactInv = 1 / ENEMY.hitReactTime;
     const wobble = ENEMY.hitWobble;
+    const cursors = [0, 0, 0];
 
     for (let i = 0; i < count; i++) {
-      const p = particles[i]!;
+      const pool = pools[type[i]!]!;
+      const p = pool.particles[cursors[type[i]!]!++]!;
       p.x = posX[i]!;
       p.y = posY[i]!;
-      const sizeScale = radius[i]! / baseR; // texture is baked at baseR
+      const sizeScale = radius[i]! * SPRITE_PER_RADIUS;
       const ht = hitTimer[i]!;
-      if (ht > 0) {
-        const t = ht * reactInv; // 1 at impact → 0 as it decays
-        p.color = lerpParticleColor(color[i]!, flash, t);
-        const s = sizeScale * (1 + wobble * t);
-        p.scaleX = s;
-        p.scaleY = s;
-      } else {
-        p.color = packParticleColor(color[i]!);
-        p.scaleX = sizeScale;
-        p.scaleY = sizeScale;
+      const s = ht > 0 ? sizeScale * (1 + wobble * ht * reactInv) : sizeScale;
+      p.scaleX = s;
+      p.scaleY = s;
+    }
+
+    for (let t = 0; t < pools.length; t++) {
+      const pool = pools[t]!;
+      const n = cursors[t]!;
+      for (let i = n; i < pool.high; i++) {
+        const p = pool.particles[i]!;
+        p.x = OFFSCREEN;
+        p.y = OFFSCREEN;
       }
+      pool.high = n;
     }
-    for (let i = count; i < this.enemyHigh; i++) {
-      const p = particles[i]!;
-      p.x = OFFSCREEN;
-      p.y = OFFSCREEN;
-    }
-    return count;
   }
 
   /**
@@ -486,6 +495,8 @@ export class Renderer {
     const axeP = this.axeParticles;
     const posX = pr.posX;
     const posY = pr.posY;
+    const velX = pr.velX;
+    const velY = pr.velY;
     const spin = pr.spin;
     const kind = pr.kind;
     const n = pr.count;
@@ -496,11 +507,12 @@ export class Renderer {
         const p = axeP[aN++]!;
         p.x = posX[i]!;
         p.y = posY[i]!;
-        p.rotation = spin[i]!;
+        p.rotation = spin[i]!; // tumble
       } else {
         const p = daggerP[dN++]!;
         p.x = posX[i]!;
         p.y = posY[i]!;
+        p.rotation = Math.atan2(velY[i]!, velX[i]!) + DAGGER_SPRITE_OFFSET;
       }
     }
     for (let i = dN; i < this.projHigh; i++) {
