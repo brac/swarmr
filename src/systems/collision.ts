@@ -9,14 +9,17 @@
 import type { GameState } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { COMBAT } from "../data/combat";
+import { BOSS } from "../data/boss";
 import { PIERCE_INFINITE } from "../state/projectiles";
 import { rollHit } from "./combat";
+import { damageBoss } from "./boss";
 
 const candidates: number[] = []; // reused scratch — never per-query alloc
 
 export function updateCollision(state: GameState): void {
   const proj = state.projectiles;
   const e = state.enemies;
+  const b = state.boss;
   const h = state.hash;
   const now = state.time;
 
@@ -25,6 +28,22 @@ export function updateCollision(state: GameState): void {
     const px = proj.posX[p]!;
     const py = proj.posY[p]!;
     const pr = proj.radius[p]!;
+
+    // The boss lives outside the hash — test it directly. Gated by its own re-hit
+    // cooldown so a dwelling infinite-pierce axe can't melt it in one tick.
+    if (b.active && now >= b.projHitUntil) {
+      const bx = b.pos.x - px;
+      const by = b.pos.y - py;
+      const brr = pr + BOSS.radius;
+      if (bx * bx + by * by <= brr * brr) {
+        damageBoss(state, proj.damage[p]!);
+        b.projHitUntil = now + BOSS.rehitGap;
+        if (proj.pierce[p] !== PIERCE_INFINITE && --proj.pierce[p]! <= 0) {
+          proj.kill(p);
+          continue; // projectile spent — next projectile
+        }
+      }
+    }
 
     h.queryNeighbors(px, py, candidates);
 

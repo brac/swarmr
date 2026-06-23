@@ -16,6 +16,7 @@ import { updateSpawn } from "./systems/spawn";
 import { updatePlayer, updateEnemies } from "./systems/movement";
 import { rebuildHash } from "./systems/broadphase";
 import { updateContact } from "./systems/contactDamage";
+import { updateBoss, spawnBoss } from "./systems/boss";
 import { updateDagger } from "./systems/weapons/dagger";
 import { updateWhip } from "./systems/weapons/whip";
 import { updateGarlic } from "./systems/weapons/garlic";
@@ -36,6 +37,10 @@ async function main(): Promise<void> {
   const levelEl = document.getElementById("level");
   const timerEl = document.getElementById("timer");
   const killsEl = document.getElementById("kills");
+  const bossWrapEl = document.getElementById("bossbar");
+  const bossFillEl = document.getElementById("bossfill");
+  const winEl = document.getElementById("win");
+  const winStatsEl = document.getElementById("winstats");
   const deathEl = document.getElementById("death");
   const upgradesEl = document.getElementById("upgrades");
   if (
@@ -47,10 +52,14 @@ async function main(): Promise<void> {
     !levelEl ||
     !timerEl ||
     !killsEl ||
+    !bossWrapEl ||
+    !bossFillEl ||
+    !winEl ||
+    !winStatsEl ||
     !deathEl ||
     !upgradesEl
   ) {
-    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#stats/#death/#upgrades)");
+    throw new Error("missing a required DOM element (HUD/overlays)");
   }
 
   // Reassignable: restart swaps in a brand-new world. The loop/listener closures
@@ -61,12 +70,15 @@ async function main(): Promise<void> {
   input.attach();
 
   // Debug keys (edge-triggered; key-repeat ignored):
-  //   R  restart (when dead)        L  toggle god mode (no contact damage)
+  //   R  restart (when dead/won)    L  toggle god mode (no contact damage)
   //   K  toggle XP leveling         ]  +1 level (opens upgrade menu)
-  //   [  -1 level
+  //   [  -1 level                   B  spawn the boss now
   window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyR" && state.gameOver) state = createGameState(SEED);
-    else if (e.code === "KeyL" && !e.repeat) {
+    if (e.code === "KeyR" && (state.gameOver || state.won)) {
+      state = createGameState(SEED);
+    } else if (e.code === "KeyB" && !e.repeat && !state.gameOver && !state.won) {
+      spawnBoss(state);
+    } else if (e.code === "KeyL" && !e.repeat) {
       state.godMode = !state.godMode;
       console.log("god mode:", state.godMode ? "ON" : "OFF");
     } else if (e.code === "KeyK" && !e.repeat) {
@@ -87,7 +99,8 @@ async function main(): Promise<void> {
     { fill: hpFillEl, text: hpTextEl },
     { fill: xpFillEl, level: levelEl },
     { timer: timerEl, kills: killsEl },
-    deathEl,
+    { wrap: bossWrapEl, fill: bossFillEl },
+    { win: winEl, winStats: winStatsEl, death: deathEl },
   );
 
   // Picking an upgrade applies it and clears one queued level-up. If more remain,
@@ -99,7 +112,7 @@ async function main(): Promise<void> {
 
   const loop = new Loop({
     update: (dt) => {
-      if (state.gameOver) return; // freeze the sim; only restart can revive it
+      if (state.gameOver || state.won) return; // frozen on the end screen
       if (state.levelUpsPending > 0) return; // paused while choosing an upgrade
 
       updateSpawn(state); // ramp the swarm to target
@@ -107,6 +120,7 @@ async function main(): Promise<void> {
       updateEnemies(state, dt); // seek the player
       rebuildHash(state); // register every enemy (positions now final this tick)
       updateContact(state, dt); // enemies touching the player deal damage (i-frames)
+      updateBoss(state, dt); // arrive at the deadline, seek, contact (before weapons)
       updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
       updateWhip(state, dt); // sweep an arc; area-overlap damage (before collision)
       updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)

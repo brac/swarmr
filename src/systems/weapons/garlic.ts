@@ -14,7 +14,9 @@
 import type { GameState } from "../../state/gameState";
 import { GARLIC } from "../../data/weapons";
 import { ENEMY } from "../../data/enemies";
+import { BOSS } from "../../data/boss";
 import { rollHit } from "../combat";
+import { damageBoss } from "../boss";
 
 export function updateGarlic(state: GameState): void {
   const e = state.enemies;
@@ -66,6 +68,18 @@ export function updateGarlic(state: GameState): void {
         );
         nextHit[j] = now + GARLIC.rehitCooldown;
       }
+    }
+  }
+
+  // Boss (outside the hash): tick it if it's inside the aura and off cooldown.
+  const b = state.boss;
+  if (b.active && now >= b.garlicNextHit) {
+    const dx = b.pos.x - px;
+    const dy = b.pos.y - py;
+    const reach = g.radius + BOSS.radius;
+    if (dx * dx + dy * dy <= reach * reach) {
+      damageBoss(state, g.damage);
+      b.garlicNextHit = now + BOSS.garlicCooldown;
     }
   }
 }

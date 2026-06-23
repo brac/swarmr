@@ -18,6 +18,7 @@ import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { DAGGER, WHIP, GARLIC } from "../data/weapons";
 import { XP, LEVEL } from "../data/xp";
+import { BOSS } from "../data/boss";
 import type { Enemies } from "../state/enemies";
 import type { Projectiles } from "../state/projectiles";
 import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
@@ -97,6 +98,9 @@ export class Renderer {
 
   // Level-up ring: one Graphics drawn once, expanded + faded over the flash.
   private levelUpRing = new Graphics();
+
+  // Boss: one big Graphics (white fill so its tint carries the color + hit-flash).
+  private bossGraphic = new Graphics();
 
   // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
   // aim (pointing +x). Per active strike we set position/rotation/alpha — no
@@ -208,6 +212,15 @@ export class Renderer {
       .stroke({ width: 4, color: 0xffd86b, alpha: 0.9 });
     this.levelUpRing.visible = false;
 
+    // Boss body: white disc + dark ring, drawn once; tinted/placed per frame.
+    this.bossGraphic
+      .circle(0, 0, BOSS.radius)
+      .fill(0xffffff)
+      .circle(0, 0, BOSS.radius)
+      .stroke({ width: 4, color: 0x1a0008, alpha: 0.6 });
+    this.bossGraphic.tint = BOSS.color;
+    this.bossGraphic.visible = false;
+
     // Pooled whip wedges. Each draws the same sector once (apex at origin,
     // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
     // place + rotate + fade one.
@@ -256,6 +269,7 @@ export class Renderer {
       frame,
       this.garlicAura,
       this.enemyContainer,
+      this.bossGraphic,
       this.whipLayer,
       this.projContainer,
       this.axeContainer,
@@ -338,6 +352,29 @@ export class Renderer {
       p2.y = OFFSCREEN;
     }
     this.gemHigh = gn;
+
+    // Boss: place it, and flash its tint toward white on hit.
+    const boss = state.boss;
+    if (boss.active) {
+      this.bossGraphic.visible = true;
+      this.bossGraphic.position.set(boss.pos.x, boss.pos.y);
+      const ht = boss.hitTimer;
+      if (ht > 0) {
+        const t = ht / ENEMY.hitReactTime; // 1 at impact → 0
+        const c = BOSS.color;
+        const r = (c >> 16) & 0xff;
+        const g = (c >> 8) & 0xff;
+        const bl = c & 0xff;
+        this.bossGraphic.tint =
+          (((r + (255 - r) * t) | 0) << 16) |
+          (((g + (255 - g) * t) | 0) << 8) |
+          ((bl + (255 - bl) * t) | 0);
+      } else {
+        this.bossGraphic.tint = BOSS.color;
+      }
+    } else if (this.bossGraphic.visible) {
+      this.bossGraphic.visible = false;
+    }
 
     // Level-up ring: expand outward and fade over the flash.
     if (state.levelUpTimer > 0) {

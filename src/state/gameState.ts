@@ -31,6 +31,16 @@ export interface Vec2 {
   y: number;
 }
 
+export interface Boss {
+  active: boolean;
+  pos: Vec2;
+  hp: number;
+  maxHp: number;
+  hitTimer: number; // hit-flash, like the swarm
+  projHitUntil: number; // sim-time gate between projectile hits
+  garlicNextHit: number; // sim-time gate between garlic ticks
+}
+
 export interface Player {
   pos: Vec2;
   speed: number; // px/sec
@@ -64,6 +74,8 @@ export interface GameState {
   levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
+  boss: Boss; // the 10-minute finale (inactive until then)
+  won: boolean; // boss defeated; the sim freezes on the victory screen
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
   godMode: boolean; // debug: ignore contact damage (toggle with L)
 }
@@ -100,6 +112,16 @@ export function createGameState(seed: number): GameState {
     levelUpTimer: 0,
     levelUpsPending: 0,
     levelingEnabled: true,
+    boss: {
+      active: false,
+      pos: { x: 0, y: 0 },
+      hp: 0,
+      maxHp: 0,
+      hitTimer: 0,
+      projHitUntil: 0,
+      garlicNextHit: 0,
+    },
+    won: false,
     gameOver: false,
     godMode: false,
   };

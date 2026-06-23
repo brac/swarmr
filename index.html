@@ -150,6 +150,68 @@
         font-size: 16px;
         color: #cdd3df;
       }
+      #bossbar {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 640px;
+        max-width: 80vw;
+        z-index: 11;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        pointer-events: none;
+        user-select: none;
+      }
+      #bosslabel {
+        font-size: 13px;
+        font-weight: bold;
+        letter-spacing: 3px;
+        color: #ff6b8a;
+        text-shadow: 0 1px 2px #000;
+      }
+      #bosstrack {
+        width: 100%;
+        height: 14px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 107, 138, 0.45);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      #bossfill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #ff3b6b, #7a0a2a);
+      }
+      #win {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #ffd86b;
+        pointer-events: none;
+        user-select: none;
+      }
+      #win .title {
+        font-size: 48px;
+        font-weight: bold;
+        letter-spacing: 4px;
+      }
+      #win .stat {
+        font-size: 18px;
+        color: #e6ebf5;
+      }
+      #win .hint {
+        font-size: 16px;
+        color: #cdd3df;
+      }
       #upgrades {
         position: fixed;
         inset: 0;
@@ -235,8 +297,17 @@
         <div id="hptext"></div>
       </div>
     </div>
+    <div id="bossbar">
+      <div id="bosslabel">BOSS</div>
+      <div id="bosstrack"><div id="bossfill"></div></div>
+    </div>
     <div id="death">
       <div class="title">YOU DIED</div>
+      <div class="hint">press R to restart</div>
+    </div>
+    <div id="win">
+      <div class="title">YOU SURVIVED</div>
+      <div class="stat" id="winstats"></div>
       <div class="hint">press R to restart</div>
     </div>
     <div id="upgrades"></div>

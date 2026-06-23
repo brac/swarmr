@@ -12,8 +12,10 @@
 import type { GameState } from "../../state/gameState";
 import { WHIP } from "../../data/weapons";
 import { ENEMY } from "../../data/enemies";
+import { BOSS } from "../../data/boss";
 import { nearestEnemy } from "../targeting";
 import { rollHit } from "../combat";
+import { damageBoss } from "../boss";
 
 export function updateWhip(state: GameState, dt: number): void {
   // Age out lingering swing visuals every tick, independent of the cooldown.
@@ -90,6 +92,19 @@ export function updateWhip(state: GameState, dt: number): void {
           roll.crit ? 1 : 0,
         );
       }
+    }
+  }
+
+  // Boss (outside the hash): one hit per swing if it's inside the wedge.
+  const b = state.boss;
+  if (b.active) {
+    const bx = b.pos.x - px;
+    const by = b.pos.y - py;
+    const bd2 = bx * bx + by * by;
+    const reach = WHIP.range + BOSS.radius;
+    if (bd2 > 1e-6 && bd2 <= reach * reach) {
+      const invd = 1 / Math.sqrt(bd2);
+      if ((bx * ux + by * uy) * invd >= cosHalf) damageBoss(state, wstat.damage);
     }
   }
 
