@@ -14,6 +14,7 @@ export class Enemies {
   readonly hp: Float32Array;
   readonly hitTimer: Float32Array; // seconds of hit-react (flash/wobble) remaining
   readonly garlicNextHit: Float32Array; // sim-time this enemy is next eligible for garlic
+  readonly projHitUntil: Float32Array; // sim-time before which a projectile won't re-hit it
 
   // Shared across the one enemy type for now; becomes per-entity if types diverge.
   readonly radius = ENEMY.radius;
@@ -26,6 +27,7 @@ export class Enemies {
     this.hp = new Float32Array(capacity);
     this.hitTimer = new Float32Array(capacity);
     this.garlicNextHit = new Float32Array(capacity);
+    this.projHitUntil = new Float32Array(capacity);
   }
 
   /** Activate one enemy. Returns its index, or -1 if at capacity. */
@@ -37,6 +39,7 @@ export class Enemies {
     this.hp[i] = ENEMY.hp;
     this.hitTimer[i] = 0;
     this.garlicNextHit[i] = 0; // eligible immediately on spawn
+    this.projHitUntil[i] = 0;
     return i;
   }
 
@@ -52,5 +55,6 @@ export class Enemies {
     this.hp[i] = this.hp[last]!;
     this.hitTimer[i] = this.hitTimer[last]!;
     this.garlicNextHit[i] = this.garlicNextHit[last]!;
+    this.projHitUntil[i] = this.projHitUntil[last]!;
   }
 }

@@ -16,6 +16,7 @@ import { updateContact } from "./systems/contactDamage";
 import { updateDagger } from "./systems/weapons/dagger";
 import { updateWhip } from "./systems/weapons/whip";
 import { updateGarlic } from "./systems/weapons/garlic";
+import { updateAxe } from "./systems/weapons/axe";
 import { updateProjectiles } from "./systems/projectiles";
 import { updateCollision } from "./systems/collision";
 import { updateDamageNumbers } from "./systems/damageNumbers";
@@ -41,8 +42,14 @@ async function main(): Promise<void> {
 
   // Restart on R once dead. keydown is edge-triggered; after the swap gameOver is
   // false, so key-repeat events are no-ops until the next death.
+  // Debug: L toggles god mode (ignore contact damage), e.g. to test weapons in
+  // the swarm without dying.
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyR" && state.gameOver) state = createGameState(SEED);
+    else if (e.code === "KeyL" && !e.repeat) {
+      state.godMode = !state.godMode;
+      console.log("god mode:", state.godMode ? "ON" : "OFF");
+    }
   });
 
   const renderer = new Renderer();
@@ -63,7 +70,8 @@ async function main(): Promise<void> {
       updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
       updateWhip(state, dt); // sweep an arc; area-overlap damage (before collision)
       updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)
-      updateProjectiles(state, dt); // travel + lifetime
+      updateAxe(state, dt); // lob gravity axes upward (pooled projectiles)
+      updateProjectiles(state, dt); // travel + lifetime (gravity arcs the axes)
       updateCollision(state); // projectile↔enemy, damage, deaths, damage numbers
       updateDamageNumbers(state, dt); // float + fade + expire
       state.time += dt;

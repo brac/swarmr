@@ -16,7 +16,8 @@ import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { DAGGER, WHIP, GARLIC } from "../data/weapons";
-import { PROJECTILE_CAPACITY } from "../state/projectiles";
+import type { Projectiles } from "../state/projectiles";
+import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
 import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
 
@@ -61,6 +62,7 @@ export class Renderer {
   private world = new Container();
   private playerDot = new Graphics();
   private garlicAura = new Graphics(); // persistent damage aura around the player
+  private shownGod = false; // last-applied god-mode tint state (gate the tint write)
 
   // Swarm layer: one batched container, one shared texture, a fixed pool of
   // particles. Scale lives in the (static) vertex property, so it's baked once
@@ -70,10 +72,16 @@ export class Renderer {
   private enemyParticles: Particle[] = [];
   private enemyHigh = 0; // high-water count, to know how many to park off-screen
 
-  // Projectile layer: same pooled-particle pattern, its own texture/tint.
+  // Projectile (Dagger) layer: same pooled-particle pattern, its own texture/tint.
   private projContainer!: ParticleContainer;
   private projParticles: Particle[] = [];
   private projHigh = 0;
+
+  // Axe layer: distinct blade texture that tumbles (rotation is dynamic). Axes
+  // live in the same projectile SoA as daggers; we route by kind into this pool.
+  private axeContainer!: ParticleContainer;
+  private axeParticles: Particle[] = [];
+  private axeHigh = 0;
 
   // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
   // aim (pointing +x). Per active strike we set position/rotation/alpha — no
@@ -156,6 +164,17 @@ export class Renderer {
     this.projContainer = proj.container;
     this.projParticles = proj.particles;
 
+    // Axe: a steel blade (rectangle) that tumbles. Position + rotation dynamic.
+    const axeTex: Texture = this.app.renderer.generateTexture(
+      new Graphics().rect(-15, -6, 30, 12).fill(0xffffff),
+    );
+    const axe = this.buildParticlePool(axeTex, 0xbcd6ff, PROJECTILE_CAPACITY, {
+      position: true,
+      rotation: true,
+    });
+    this.axeContainer = axe.container;
+    this.axeParticles = axe.particles;
+
     // Pooled whip wedges. Each draws the same sector once (apex at origin,
     // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
     // place + rotate + fade one.
@@ -197,6 +216,7 @@ export class Renderer {
       this.enemyContainer,
       this.whipLayer,
       this.projContainer,
+      this.axeContainer,
       this.dnLayer,
       this.playerDot,
     );
@@ -228,6 +248,11 @@ export class Renderer {
     // Blink while invulnerable (i-frames) so a hit reads instantly; solid otherwise.
     this.playerDot.alpha =
       p.invuln > 0 && ((p.invuln * 20) | 0) % 2 === 0 ? 0.35 : 1;
+    // God mode tints the player gold; gated so the tint setter runs only on change.
+    if (state.godMode !== this.shownGod) {
+      this.playerDot.tint = state.godMode ? 0xffd700 : 0xffffff;
+      this.shownGod = state.godMode;
+    }
 
     // Garlic aura follows the player; gentle alpha pulse to read as "active".
     this.garlicAura.position.set(p.pos.x, p.pos.y);
@@ -236,14 +261,7 @@ export class Renderer {
     const e = state.enemies;
     this.enemyHigh = this.syncEnemies(e.count, e.posX, e.posY, e.hitTimer);
 
-    const pr = state.projectiles;
-    this.projHigh = this.syncParticles(
-      this.projParticles,
-      this.projHigh,
-      pr.count,
-      pr.posX,
-      pr.posY,
-    );
+    this.syncProjectiles(state.projectiles);
 
     // Whip strikes: place/rotate/fade each active wedge; hide the rest.
     const ws = state.whipStrikes;
@@ -307,9 +325,12 @@ export class Renderer {
     tex: Texture,
     tint: number,
     capacity: number,
-    dynamic: { position?: boolean; color?: boolean; vertex?: boolean } = {
-      position: true,
-    },
+    dynamic: {
+      position?: boolean;
+      color?: boolean;
+      vertex?: boolean;
+      rotation?: boolean;
+    } = { position: true },
   ): { container: ParticleContainer; particles: Particle[] } {
     const particles: Particle[] = [];
     for (let i = 0; i < capacity; i++) {
@@ -378,26 +399,43 @@ export class Renderer {
   }
 
   /**
-   * Move the first `count` particles to a SoA's positions; park the rest (down
-   * to last frame's high-water mark) off-screen. Returns the new high-water mark.
+   * Route the mixed projectile SoA into its two visual pools by kind: daggers to
+   * the projectile pool, axes to the spinning blade pool (with rotation). Parks
+   * each pool's leftovers off-screen.
    */
-  private syncParticles(
-    particles: Particle[],
-    high: number,
-    count: number,
-    posX: Float32Array,
-    posY: Float32Array,
-  ): number {
-    for (let i = 0; i < count; i++) {
-      const p = particles[i]!;
-      p.x = posX[i]!;
-      p.y = posY[i]!;
+  private syncProjectiles(pr: Projectiles): void {
+    const daggerP = this.projParticles;
+    const axeP = this.axeParticles;
+    const posX = pr.posX;
+    const posY = pr.posY;
+    const spin = pr.spin;
+    const kind = pr.kind;
+    const n = pr.count;
+    let dN = 0;
+    let aN = 0;
+    for (let i = 0; i < n; i++) {
+      if (kind[i] === PROJ_AXE) {
+        const p = axeP[aN++]!;
+        p.x = posX[i]!;
+        p.y = posY[i]!;
+        p.rotation = spin[i]!;
+      } else {
+        const p = daggerP[dN++]!;
+        p.x = posX[i]!;
+        p.y = posY[i]!;
+      }
     }
-    for (let i = count; i < high; i++) {
-      const p = particles[i]!;
+    for (let i = dN; i < this.projHigh; i++) {
+      const p = daggerP[i]!;
       p.x = OFFSCREEN;
       p.y = OFFSCREEN;
     }
-    return count;
+    for (let i = aN; i < this.axeHigh; i++) {
+      const p = axeP[i]!;
+      p.x = OFFSCREEN;
+      p.y = OFFSCREEN;
+    }
+    this.projHigh = dN;
+    this.axeHigh = aN;
   }
 }

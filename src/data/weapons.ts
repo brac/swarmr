@@ -23,6 +23,22 @@ export const WHIP = {
   strikeTTL: 0.18, // how long the swing graphic lingers/fades (s)
 } as const;
 
+// Axe — a projectile with gravity. Launched up from the player with a random
+// horizontal lean, it arcs over and falls off the bottom of the screen, piercing
+// and damaging everything it passes through. The new system it forces: per-
+// projectile gravity (the pool was straight-line until now).
+export const AXE = {
+  cooldown: 1.4, // seconds between throws
+  damage: 20,
+  radius: 14, // collision radius (px)
+  gravity: 900, // downward accel (px/s²) → the parabola
+  launchSpeedY: 720, // initial upward speed (px/s)
+  launchSpeedX: 200, // max |horizontal| launch speed (px/s), randomized per throw
+  spinRate: 14, // visual tumble (rad/s)
+  lifetime: 3, // backstop despawn (s); normally it falls off the bottom first
+  count: 1, // axes per throw
+} as const;
+
 // Garlic — a persistent aura centered on the player, no cooldown to "fire". Any
 // enemy inside the radius takes damage, but each enemy has its own re-hit cooldown
 // (the DoT cadence): once hit it can't be hit again for rehitCooldown seconds.
@@ -31,4 +47,8 @@ export const GARLIC = {
   radius: 120, // aura radius (px)
   damage: 5, // per hit
   rehitCooldown: 0.45, // seconds before the same enemy can be hit again
+  // The aura ticks a whole crowd; popping a damage number per enemy is an
+  // unreadable blur AND a BitmapText-layout allocation firehose. Show only a
+  // sampled fraction. The hit-flash still fires on every tick, so it reads fine.
+  numberChance: 0.12, // probability a garlic hit spawns a damage number
 } as const;

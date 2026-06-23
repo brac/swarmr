@@ -15,6 +15,12 @@ const candidates: number[] = []; // reused scratch — never per-call alloc
 export function updateContact(state: GameState, dt: number): void {
   const p = state.player;
 
+  // Debug god mode: take no contact damage at all.
+  if (state.godMode) {
+    p.invuln = 0;
+    return;
+  }
+
   // Tick i-frames down. While invulnerable, no contact can land — skip the query.
   if (p.invuln > 0) {
     p.invuln -= dt;

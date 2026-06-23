@@ -5,6 +5,7 @@
 
 import type { GameState } from "../../state/gameState";
 import { DAGGER } from "../../data/weapons";
+import { PROJ_DAGGER } from "../../state/projectiles";
 import { nearestEnemy } from "../targeting";
 
 export function updateDagger(state: GameState, dt: number): void {
@@ -38,6 +39,8 @@ export function updateDagger(state: GameState, dt: number): void {
       DAGGER.projectileRadius,
       DAGGER.damage,
       DAGGER.pierce,
+      0, // no gravity — straight-line
+      PROJ_DAGGER,
     );
   }
 

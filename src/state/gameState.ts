@@ -47,8 +47,10 @@ export interface GameState {
   damageNumbers: DamageNumbers;
   daggerTimer: number; // seconds until the Dagger may fire again
   whipTimer: number; // seconds until the Whip may swing again
+  axeTimer: number; // seconds until the Axe may throw again
   whipStrikes: WhipStrikes; // lingering swing visuals
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
+  godMode: boolean; // debug: ignore contact damage (toggle with L)
 }
 
 export function createGameState(seed: number): GameState {
@@ -70,7 +72,9 @@ export function createGameState(seed: number): GameState {
     damageNumbers: new DamageNumbers(DAMAGE_NUMBER_CAPACITY),
     daggerTimer: 0,
     whipTimer: 0,
+    axeTimer: 0,
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
     gameOver: false,
+    godMode: false,
   };
 }

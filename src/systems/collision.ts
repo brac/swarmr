@@ -8,6 +8,8 @@
 
 import type { GameState } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
+import { COMBAT } from "../data/combat";
+import { PIERCE_INFINITE } from "../state/projectiles";
 import { rollHit } from "./combat";
 
 const candidates: number[] = []; // reused scratch — never per-query alloc
@@ -16,6 +18,7 @@ export function updateCollision(state: GameState): void {
   const proj = state.projectiles;
   const e = state.enemies;
   const h = state.hash;
+  const now = state.time;
 
   // Downward so projectile swap-remove is safe.
   for (let p = proj.count - 1; p >= 0; p--) {
@@ -28,6 +31,7 @@ export function updateCollision(state: GameState): void {
     for (let k = 0; k < candidates.length; k++) {
       const ei = candidates[k]!;
       if (e.hp[ei]! <= 0) continue; // already killed earlier this tick
+      if (now < e.projHitUntil[ei]!) continue; // hit too recently by a projectile
 
       const dx = e.posX[ei]! - px;
       const dy = e.posY[ei]! - py;
@@ -38,6 +42,7 @@ export function updateCollision(state: GameState): void {
       const roll = rollHit(state.rng, proj.damage[p]!);
       e.hp[ei]! -= roll.amount;
       e.hitTimer[ei] = ENEMY.hitReactTime;
+      e.projHitUntil[ei] = now + COMBAT.projectileRehitGap;
       state.damageNumbers.spawn(
         e.posX[ei]!,
         e.posY[ei]! - e.radius,
@@ -45,7 +50,9 @@ export function updateCollision(state: GameState): void {
         roll.crit ? 1 : 0,
       );
 
-      if (--proj.pierce[p]! <= 0) {
+      // Infinite-pierce projectiles (axes) carve through everyone — never
+      // consumed, never killed here; they end only by leaving the world.
+      if (proj.pierce[p] !== PIERCE_INFINITE && --proj.pierce[p]! <= 0) {
         proj.kill(p);
         break; // this projectile is gone; stop testing it
       }
