@@ -1,5 +1,5 @@
-// Damage-number state — pooled SoA. The visual (pooled BitmapText) lives in the
-// renderer; this holds only the data so the view stays dumb and rebuildable.
+// Damage-number state — pooled SoA. The visual (pooled digit sprites) lives in
+// the renderer; this holds only the data so the view stays dumb and rebuildable.
 
 export const DAMAGE_NUMBER_CAPACITY = 256;
 export const DN_TTL = 0.6; // lifetime (s)

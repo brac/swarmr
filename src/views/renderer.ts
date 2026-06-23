@@ -5,11 +5,12 @@
 
 import {
   Application,
-  BitmapText,
   Container,
   Graphics,
   Particle,
   ParticleContainer,
+  Sprite,
+  Text,
 } from "pixi.js";
 import type { Texture } from "pixi.js";
 import type { GameState } from "../state/gameState";
@@ -18,6 +19,7 @@ import { ENEMY } from "../data/enemies";
 import { DAGGER, WHIP, GARLIC } from "../data/weapons";
 import type { Projectiles } from "../state/projectiles";
 import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
+import type { DamageNumbers } from "../state/damageNumbers";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
 import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
 
@@ -28,6 +30,9 @@ const OFFSCREEN = -10000;
 // Crit damage numbers: bigger and red so they read instantly over the swarm.
 const DN_CRIT_COLOR = 0xff4040;
 const DN_CRIT_SCALE = 1.6;
+const DN_MAX_DIGITS = 4; // up to 9999 per number; caps the digit-sprite pool size
+// Reused scratch for extracting a number's digits (least-significant first).
+const digitScratch = new Int32Array(DN_MAX_DIGITS);
 
 /**
  * Pack an 0xRRGGBB color (with full alpha) into Particle.color's wire format:
@@ -90,14 +95,17 @@ export class Renderer {
   private whipGraphics: Graphics[] = [];
   private whipHigh = 0;
 
-  // Damage numbers: pooled BitmapText (one shared dynamic bitmap font → batched
-  // glyphs, no per-number texture allocation). `shownValue` lets us skip glyph
-  // re-layout — we only set `.text` when a slot's value actually changes.
+  // Damage numbers: composed from pooled digit sprites. Digit glyphs are pre-
+  // rendered once to textures (white + a red set for crits); each number lays out
+  // its digits by integer math and assigns them to sprites. Per frame we only set
+  // texture/position/alpha/scale — all plain field writes, so throughput never
+  // allocates (the BitmapText.text re-layout it replaces did, badly).
   private dnLayer = new Container();
-  private dnTexts: BitmapText[] = [];
-  private dnShownValue: number[] = [];
-  private dnShownCrit: number[] = []; // last-applied crit style per slot (gate tint/scale)
-  private dnHigh = 0;
+  private digitSprites: Sprite[] = [];
+  private whiteDigits: Texture[] = []; // index 0..9
+  private redDigits: Texture[] = []; // crit color, index 0..9
+  private digitWidth = 0; // px advance per digit (monospace → uniform)
+  private digitHigh = 0; // high-water count of sprites used last frame
 
   async init(parent: HTMLElement): Promise<void> {
     await this.app.init({
@@ -189,23 +197,31 @@ export class Renderer {
       this.whipLayer.addChild(g);
     }
 
-    // Pooled damage-number text objects (hidden until used).
-    for (let i = 0; i < DAMAGE_NUMBER_CAPACITY; i++) {
-      const bt = new BitmapText({
-        text: "",
-        style: {
-          fontFamily: "monospace",
-          fontSize: 30,
-          fontWeight: "bold",
-          fill: 0xffffff,
-        },
-      });
-      bt.anchor.set(0.5);
-      bt.visible = false;
-      this.dnTexts.push(bt);
-      this.dnShownValue.push(-1);
-      this.dnShownCrit.push(-1);
-      this.dnLayer.addChild(bt);
+    // Pre-render each digit 0-9 to a texture, once, in white and in crit-red.
+    // Damage numbers are then composed from these — no per-number text layout.
+    for (let d = 0; d < 10; d++) {
+      const mk = (fill: number): Texture => {
+        const t = new Text({
+          text: "" + d,
+          style: { fontFamily: "monospace", fontSize: 30, fontWeight: "bold", fill },
+        });
+        const tex = this.app.renderer.generateTexture(t);
+        t.destroy();
+        return tex;
+      };
+      this.whiteDigits.push(mk(0xffffff));
+      this.redDigits.push(mk(DN_CRIT_COLOR));
+    }
+    // Monospace → every digit the same width; use it as the layout advance.
+    this.digitWidth = this.whiteDigits[0]!.width;
+
+    // Pool of digit sprites: capacity numbers × max digits each.
+    for (let i = 0; i < DAMAGE_NUMBER_CAPACITY * DN_MAX_DIGITS; i++) {
+      const s = new Sprite(this.whiteDigits[0]!);
+      s.anchor.set(0.5);
+      s.visible = false;
+      this.digitSprites.push(s);
+      this.dnLayer.addChild(s);
     }
 
     // Draw order: backdrop, garlic aura, swarm, whip arcs, projectiles, numbers,
@@ -277,40 +293,7 @@ export class Renderer {
     for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
     this.whipHigh = wn;
 
-    // Damage numbers: position + fade by age; set text only when a slot's value
-    // changed (swap-remove can move a different number into a slot).
-    const dn = state.damageNumbers;
-    const texts = this.dnTexts;
-    const shown = this.dnShownValue;
-    const shownCrit = this.dnShownCrit;
-    const n = dn.count;
-    for (let i = 0; i < n; i++) {
-      const bt = texts[i]!;
-      const v = dn.value[i]!;
-      if (shown[i] !== v) {
-        bt.text = "" + v;
-        shown[i] = v;
-      }
-      bt.x = dn.posX[i]!;
-      bt.y = dn.posY[i]!;
-      bt.alpha = 1 - dn.age[i]! / DN_TTL;
-      // Crits read bigger and red; normal hits stay white at base size. Gated:
-      // the tint setter parses a Color, so only touch it when the style changes.
-      const crit = dn.crit[i]!;
-      if (shownCrit[i] !== crit) {
-        if (crit === 1) {
-          bt.tint = DN_CRIT_COLOR;
-          bt.scale.set(DN_CRIT_SCALE);
-        } else {
-          bt.tint = 0xffffff;
-          bt.scale.set(1);
-        }
-        shownCrit[i] = crit;
-      }
-      bt.visible = true;
-    }
-    for (let i = n; i < this.dnHigh; i++) texts[i]!.visible = false;
-    this.dnHigh = n;
+    this.syncDamageNumbers(state.damageNumbers);
 
     this.app.renderer.render(this.app.stage);
   }
@@ -437,5 +420,55 @@ export class Renderer {
     }
     this.projHigh = dN;
     this.axeHigh = aN;
+  }
+
+  /**
+   * Compose each active damage number from pooled digit sprites: extract digits
+   * by integer math, lay them out centered on the number, and set
+   * texture/position/alpha/scale. White sprites for normal hits, the red set
+   * (bigger) for crits. All plain field writes — zero allocation per number, so
+   * throughput is free (the whole point of replacing BitmapText).
+   */
+  private syncDamageNumbers(dn: DamageNumbers): void {
+    const sprites = this.digitSprites;
+    const white = this.whiteDigits;
+    const red = this.redDigits;
+    const w = this.digitWidth;
+    const cap = sprites.length;
+    const n = dn.count;
+    let s = 0; // sprite cursor across all numbers
+
+    for (let i = 0; i < n && s < cap; i++) {
+      const v = dn.value[i]!;
+      const crit = dn.crit[i]! === 1;
+      const alpha = 1 - dn.age[i]! / DN_TTL;
+      const scale = crit ? DN_CRIT_SCALE : 1;
+      const set = crit ? red : white;
+
+      // Digits, least-significant first.
+      let nd = 0;
+      let t = v;
+      do {
+        digitScratch[nd++] = t % 10;
+        t = (t / 10) | 0;
+      } while (t > 0 && nd < DN_MAX_DIGITS);
+
+      // Lay out left→right, centered on the number's position.
+      const advance = w * scale;
+      const startX = dn.posX[i]! - ((nd - 1) * advance) / 2;
+      const y = dn.posY[i]!;
+      for (let p = 0; p < nd && s < cap; p++) {
+        const sp = sprites[s++]!;
+        sp.texture = set[digitScratch[nd - 1 - p]!]!;
+        sp.x = startX + p * advance;
+        sp.y = y;
+        sp.alpha = alpha;
+        sp.scale.set(scale);
+        sp.visible = true;
+      }
+    }
+
+    for (let i = s; i < this.digitHigh; i++) sprites[i]!.visible = false;
+    this.digitHigh = s;
   }
 }

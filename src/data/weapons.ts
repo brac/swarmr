@@ -47,8 +47,4 @@ export const GARLIC = {
   radius: 120, // aura radius (px)
   damage: 5, // per hit
   rehitCooldown: 0.45, // seconds before the same enemy can be hit again
-  // The aura ticks a whole crowd; popping a damage number per enemy is an
-  // unreadable blur AND a BitmapText-layout allocation firehose. Show only a
-  // sampled fraction. The hit-flash still fires on every tick, so it reads fine.
-  numberChance: 0.12, // probability a garlic hit spawns a damage number
 } as const;

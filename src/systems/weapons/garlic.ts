@@ -57,16 +57,12 @@ export function updateGarlic(state: GameState): void {
         const roll = rollHit(state.rng, GARLIC.damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
-        // Only a sampled fraction pops a number — the aura would otherwise spam
-        // hundreds of BitmapText layouts/sec. Flash above already shows the hit.
-        if (state.rng.next() < GARLIC.numberChance) {
-          state.damageNumbers.spawn(
-            posX[j]!,
-            posY[j]! - radius,
-            roll.amount,
-            roll.crit ? 1 : 0,
-          );
-        }
+        state.damageNumbers.spawn(
+          posX[j]!,
+          posY[j]! - radius,
+          roll.amount,
+          roll.crit ? 1 : 0,
+        );
         nextHit[j] = now + GARLIC.rehitCooldown;
       }
     }
