@@ -15,6 +15,7 @@ import { rebuildHash } from "./systems/broadphase";
 import { updateContact } from "./systems/contactDamage";
 import { updateDagger } from "./systems/weapons/dagger";
 import { updateWhip } from "./systems/weapons/whip";
+import { updateGarlic } from "./systems/weapons/garlic";
 import { updateProjectiles } from "./systems/projectiles";
 import { updateCollision } from "./systems/collision";
 import { updateDamageNumbers } from "./systems/damageNumbers";
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
       updateContact(state, dt); // enemies touching the player deal damage (i-frames)
       updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
       updateWhip(state, dt); // sweep an arc; area-overlap damage (before collision)
+      updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)
       updateProjectiles(state, dt); // travel + lifetime
       updateCollision(state); // projectile↔enemy, damage, deaths, damage numbers
       updateDamageNumbers(state, dt); // float + fade + expire

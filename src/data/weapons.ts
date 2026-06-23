@@ -22,3 +22,13 @@ export const WHIP = {
   arcHalfAngle: 0.7, // half-width of the wedge (rad) → ~80° full arc
   strikeTTL: 0.18, // how long the swing graphic lingers/fades (s)
 } as const;
+
+// Garlic — a persistent aura centered on the player, no cooldown to "fire". Any
+// enemy inside the radius takes damage, but each enemy has its own re-hit cooldown
+// (the DoT cadence): once hit it can't be hit again for rehitCooldown seconds.
+// That per-entity cooldown is the lesson here — reused by every zone/DoT effect.
+export const GARLIC = {
+  radius: 120, // aura radius (px)
+  damage: 5, // per hit
+  rehitCooldown: 0.45, // seconds before the same enemy can be hit again
+} as const;

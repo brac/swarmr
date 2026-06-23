@@ -15,7 +15,7 @@ import type { Texture } from "pixi.js";
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
-import { DAGGER, WHIP } from "../data/weapons";
+import { DAGGER, WHIP, GARLIC } from "../data/weapons";
 import { PROJECTILE_CAPACITY } from "../state/projectiles";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
 import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
@@ -60,6 +60,7 @@ export class Renderer {
   /** Everything in world space lives under here; we scale/position it to fit. */
   private world = new Container();
   private playerDot = new Graphics();
+  private garlicAura = new Graphics(); // persistent damage aura around the player
 
   // Swarm layer: one batched container, one shared texture, a fixed pool of
   // particles. Scale lives in the (static) vertex property, so it's baked once
@@ -124,6 +125,14 @@ export class Renderer {
 
     this.playerDot.circle(0, 0, 16).fill(0x8fff8f);
 
+    // Garlic aura: a faint greenish disc with a soft ring, drawn once at origin
+    // and moved to the player each frame. Alpha pulses gently for an "aura" feel.
+    this.garlicAura
+      .circle(0, 0, GARLIC.radius)
+      .fill({ color: 0x88ff88, alpha: 0.06 })
+      .circle(0, 0, GARLIC.radius)
+      .stroke({ width: 2, color: 0x88ff88, alpha: 0.25 });
+
     // Grey-box textures: white circles tinted per particle. One shared base
     // texture per layer = one batch. Real art swaps these for atlas frames later.
     const enemyTex: Texture = this.app.renderer.generateTexture(
@@ -180,9 +189,11 @@ export class Renderer {
       this.dnLayer.addChild(bt);
     }
 
-    // Draw order: backdrop, swarm, whip arcs, projectiles, numbers, player on top.
+    // Draw order: backdrop, garlic aura, swarm, whip arcs, projectiles, numbers,
+    // player on top. The aura sits under the swarm so enemies wade through it.
     this.world.addChild(
       frame,
+      this.garlicAura,
       this.enemyContainer,
       this.whipLayer,
       this.projContainer,
@@ -217,6 +228,10 @@ export class Renderer {
     // Blink while invulnerable (i-frames) so a hit reads instantly; solid otherwise.
     this.playerDot.alpha =
       p.invuln > 0 && ((p.invuln * 20) | 0) % 2 === 0 ? 0.35 : 1;
+
+    // Garlic aura follows the player; gentle alpha pulse to read as "active".
+    this.garlicAura.position.set(p.pos.x, p.pos.y);
+    this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
 
     const e = state.enemies;
     this.enemyHigh = this.syncEnemies(e.count, e.posX, e.posY, e.hitTimer);
