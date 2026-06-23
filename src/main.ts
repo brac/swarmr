@@ -44,6 +44,8 @@ async function main(): Promise<void> {
   const winStatsEl = document.getElementById("winstats");
   const deathEl = document.getElementById("death");
   const upgradesEl = document.getElementById("upgrades");
+  const titleEl = document.getElementById("title");
+  const pauseEl = document.getElementById("pause");
   if (
     !appEl ||
     !perfEl ||
@@ -58,7 +60,9 @@ async function main(): Promise<void> {
     !winEl ||
     !winStatsEl ||
     !deathEl ||
-    !upgradesEl
+    !upgradesEl ||
+    !titleEl ||
+    !pauseEl
   ) {
     throw new Error("missing a required DOM element (HUD/overlays)");
   }
@@ -72,13 +76,42 @@ async function main(): Promise<void> {
 
   const audio = new Audio();
 
+  // App lifecycle: title → playing (Esc pause) → death/win → restart into play.
+  // These gate the sim; render keeps running so overlays draw over a frozen scene.
+  let started = false;
+  let paused = false;
+
+  const startGame = (): void => {
+    if (started) return;
+    started = true;
+    titleEl.style.display = "none";
+  };
+  const setPaused = (v: boolean): void => {
+    paused = v;
+    pauseEl.style.display = v ? "flex" : "none";
+  };
+
+  // Click the title to begin (any key also works, below).
+  titleEl.addEventListener("click", startGame);
+
   // Debug keys (edge-triggered; key-repeat ignored):
   //   R  restart (when dead/won)    L  toggle god mode (no contact damage)
   //   K  toggle XP leveling         ]  +1 level (opens upgrade menu)
   //   [  -1 level                   B  spawn the boss now    M  mute
   window.addEventListener("keydown", (e) => {
+    // Any key starts the run from the title screen.
+    if (!started) {
+      startGame();
+      return;
+    }
+    // Esc pauses / resumes during play.
+    if (e.code === "Escape" && !state.gameOver && !state.won) {
+      setPaused(!paused);
+      return;
+    }
     if (e.code === "KeyR" && (state.gameOver || state.won)) {
       state = createGameState(SEED);
+      setPaused(false);
     } else if (e.code === "KeyB" && !e.repeat && !state.gameOver && !state.won) {
       spawnBoss(state);
     } else if (e.code === "KeyL" && !e.repeat) {
@@ -117,6 +150,7 @@ async function main(): Promise<void> {
 
   const loop = new Loop({
     update: (dt) => {
+      if (!started || paused) return; // title screen / Esc pause
       if (state.gameOver || state.won) return; // frozen on the end screen
       if (state.levelUpsPending > 0) return; // paused while choosing an upgrade
 

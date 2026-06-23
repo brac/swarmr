@@ -212,6 +212,65 @@
         font-size: 16px;
         color: #cdd3df;
       }
+      #pause {
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.55);
+        color: #f2f4f8;
+        pointer-events: none;
+        user-select: none;
+      }
+      #pause .title {
+        font-size: 44px;
+        font-weight: bold;
+        letter-spacing: 6px;
+      }
+      #pause .hint {
+        font-size: 16px;
+        color: #cdd3df;
+      }
+      #title {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: rgba(8, 10, 16, 0.92);
+        pointer-events: auto;
+        user-select: none;
+        cursor: pointer;
+      }
+      #title .game {
+        font-size: 72px;
+        font-weight: bold;
+        letter-spacing: 8px;
+        color: #ff5566;
+        text-shadow: 0 2px 16px rgba(255, 85, 102, 0.4);
+      }
+      #title .tag {
+        font-size: 18px;
+        letter-spacing: 2px;
+        color: #bcd6ff;
+      }
+      #title .controls {
+        font-size: 14px;
+        color: #aab2c5;
+        margin-top: 6px;
+      }
+      #title .start {
+        font-size: 18px;
+        color: #ffd86b;
+        margin-top: 22px;
+      }
       #upgrades {
         position: fixed;
         inset: 0;
@@ -311,6 +370,18 @@
       <div class="hint">press R to restart</div>
     </div>
     <div id="upgrades"></div>
+    <div id="pause">
+      <div class="title">PAUSED</div>
+      <div class="hint">Esc to resume</div>
+    </div>
+    <div id="title">
+      <div class="game">swarmr</div>
+      <div class="tag">a bullet-heaven survivor</div>
+      <div class="controls">
+        WASD / arrows to move · survive 10:00 · slay the boss
+      </div>
+      <div class="start">▶ press any key to begin</div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
