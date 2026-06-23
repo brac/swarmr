@@ -5,6 +5,7 @@
 
 import {
   Application,
+  BitmapText,
   Container,
   Graphics,
   Particle,
@@ -14,6 +15,9 @@ import type { Texture } from "pixi.js";
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
+import { DAGGER } from "../data/weapons";
+import { PROJECTILE_CAPACITY } from "../state/projectiles";
+import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
 
 // Where inactive pooled particles sit — well outside the 1920x1080 world so they
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
@@ -32,6 +36,19 @@ export class Renderer {
   private enemyContainer!: ParticleContainer;
   private enemyParticles: Particle[] = [];
   private enemyHigh = 0; // high-water count, to know how many to park off-screen
+
+  // Projectile layer: same pooled-particle pattern, its own texture/tint.
+  private projContainer!: ParticleContainer;
+  private projParticles: Particle[] = [];
+  private projHigh = 0;
+
+  // Damage numbers: pooled BitmapText (one shared dynamic bitmap font → batched
+  // glyphs, no per-number texture allocation). `shownValue` lets us skip glyph
+  // re-layout — we only set `.text` when a slot's value actually changes.
+  private dnLayer = new Container();
+  private dnTexts: BitmapText[] = [];
+  private dnShownValue: number[] = [];
+  private dnHigh = 0;
 
   async init(parent: HTMLElement): Promise<void> {
     await this.app.init({
@@ -67,38 +84,49 @@ export class Renderer {
 
     this.playerDot.circle(0, 0, 16).fill(0x8fff8f);
 
-    // Grey-box enemy texture: a white circle, tinted per particle. Single shared
-    // base texture = one batch. Real art swaps this for an atlas frame later.
+    // Grey-box textures: white circles tinted per particle. One shared base
+    // texture per layer = one batch. Real art swaps these for atlas frames later.
     const enemyTex: Texture = this.app.renderer.generateTexture(
       new Graphics().circle(0, 0, ENEMY.radius).fill(0xffffff),
     );
-    const parts: Particle[] = [];
-    for (let i = 0; i < ENEMY.capacity; i++) {
-      parts.push(
-        new Particle({
-          texture: enemyTex,
-          tint: 0xff5566,
-          anchorX: 0.5,
-          anchorY: 0.5,
-          // Start parked off-screen; render() moves the active ones in.
-          x: OFFSCREEN,
-          y: OFFSCREEN,
-        }),
-      );
-    }
-    this.enemyParticles = parts;
-    this.enemyContainer = new ParticleContainer({
-      // Only position changes per frame; scale/color stay static (and fast).
-      dynamicProperties: { position: true },
-      texture: enemyTex,
-      particles: parts,
-    });
-    // REQUIRED: build the static buffers (vertex/scale, uvs, color). Without this
-    // the vertex buffer is never uploaded and every quad renders at zero size.
-    this.enemyContainer.update();
+    const projTex: Texture = this.app.renderer.generateTexture(
+      new Graphics().circle(0, 0, DAGGER.projectileRadius).fill(0xffffff),
+    );
 
-    // Draw order: backdrop, swarm, then player on top.
-    this.world.addChild(frame, this.enemyContainer, this.playerDot);
+    const enemy = this.buildParticlePool(enemyTex, 0xff5566, ENEMY.capacity);
+    this.enemyContainer = enemy.container;
+    this.enemyParticles = enemy.particles;
+
+    const proj = this.buildParticlePool(projTex, 0xffe066, PROJECTILE_CAPACITY);
+    this.projContainer = proj.container;
+    this.projParticles = proj.particles;
+
+    // Pooled damage-number text objects (hidden until used).
+    for (let i = 0; i < DAMAGE_NUMBER_CAPACITY; i++) {
+      const bt = new BitmapText({
+        text: "",
+        style: {
+          fontFamily: "monospace",
+          fontSize: 30,
+          fontWeight: "bold",
+          fill: 0xffffff,
+        },
+      });
+      bt.anchor.set(0.5);
+      bt.visible = false;
+      this.dnTexts.push(bt);
+      this.dnShownValue.push(-1);
+      this.dnLayer.addChild(bt);
+    }
+
+    // Draw order: backdrop, swarm, projectiles, damage numbers, player on top.
+    this.world.addChild(
+      frame,
+      this.enemyContainer,
+      this.projContainer,
+      this.dnLayer,
+      this.playerDot,
+    );
     this.app.stage.addChild(this.world);
 
     // Pixi's own ticker drives nothing — our fixed-timestep Loop owns timing.
@@ -125,21 +153,97 @@ export class Renderer {
     this.playerDot.position.set(state.player.pos.x, state.player.pos.y);
 
     const e = state.enemies;
-    const parts = this.enemyParticles;
-    const n = e.count;
+    this.enemyHigh = this.syncParticles(
+      this.enemyParticles,
+      this.enemyHigh,
+      e.count,
+      e.posX,
+      e.posY,
+    );
+
+    const pr = state.projectiles;
+    this.projHigh = this.syncParticles(
+      this.projParticles,
+      this.projHigh,
+      pr.count,
+      pr.posX,
+      pr.posY,
+    );
+
+    // Damage numbers: position + fade by age; set text only when a slot's value
+    // changed (swap-remove can move a different number into a slot).
+    const dn = state.damageNumbers;
+    const texts = this.dnTexts;
+    const shown = this.dnShownValue;
+    const n = dn.count;
     for (let i = 0; i < n; i++) {
-      const p = parts[i]!;
-      p.x = e.posX[i]!;
-      p.y = e.posY[i]!;
+      const bt = texts[i]!;
+      const v = dn.value[i]!;
+      if (shown[i] !== v) {
+        bt.text = "" + v;
+        shown[i] = v;
+      }
+      bt.x = dn.posX[i]!;
+      bt.y = dn.posY[i]!;
+      bt.alpha = 1 - dn.age[i]! / DN_TTL;
+      bt.visible = true;
     }
-    // Park any that were active last frame but aren't now.
-    for (let i = n; i < this.enemyHigh; i++) {
-      const p = parts[i]!;
+    for (let i = n; i < this.dnHigh; i++) texts[i]!.visible = false;
+    this.dnHigh = n;
+
+    this.app.renderer.render(this.app.stage);
+  }
+
+  /** Build a pooled ParticleContainer: capacity particles parked off-screen. */
+  private buildParticlePool(
+    tex: Texture,
+    tint: number,
+    capacity: number,
+  ): { container: ParticleContainer; particles: Particle[] } {
+    const particles: Particle[] = [];
+    for (let i = 0; i < capacity; i++) {
+      particles.push(
+        new Particle({
+          texture: tex,
+          tint,
+          anchorX: 0.5,
+          anchorY: 0.5,
+          x: OFFSCREEN,
+          y: OFFSCREEN,
+        }),
+      );
+    }
+    const container = new ParticleContainer({
+      dynamicProperties: { position: true },
+      texture: tex,
+      particles,
+    });
+    // Build static buffers (scale/uvs/color) once, else quads render zero-size.
+    container.update();
+    return { container, particles };
+  }
+
+  /**
+   * Move the first `count` particles to a SoA's positions; park the rest (down
+   * to last frame's high-water mark) off-screen. Returns the new high-water mark.
+   */
+  private syncParticles(
+    particles: Particle[],
+    high: number,
+    count: number,
+    posX: Float32Array,
+    posY: Float32Array,
+  ): number {
+    for (let i = 0; i < count; i++) {
+      const p = particles[i]!;
+      p.x = posX[i]!;
+      p.y = posY[i]!;
+    }
+    for (let i = count; i < high; i++) {
+      const p = particles[i]!;
       p.x = OFFSCREEN;
       p.y = OFFSCREEN;
     }
-    this.enemyHigh = n;
-
-    this.app.renderer.render(this.app.stage);
+    return count;
   }
 }

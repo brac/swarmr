@@ -10,6 +10,10 @@ import { PerfOverlay } from "./views/perfOverlay";
 import { updateSpawn } from "./systems/spawn";
 import { updatePlayer, updateEnemies } from "./systems/movement";
 import { rebuildHash } from "./systems/broadphase";
+import { updateDagger } from "./systems/weapons/dagger";
+import { updateProjectiles } from "./systems/projectiles";
+import { updateCollision } from "./systems/collision";
+import { updateDamageNumbers } from "./systems/damageNumbers";
 
 const SEED = 0x5eed; // fixed seed → reproducible runs (debugging)
 
@@ -33,7 +37,11 @@ async function main(): Promise<void> {
       updateSpawn(state); // ramp the swarm to target
       updatePlayer(state, input, dt); // WASD
       updateEnemies(state, dt); // seek the player
-      rebuildHash(state); // register every enemy in the broadphase
+      rebuildHash(state); // register every enemy (positions now final this tick)
+      updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
+      updateProjectiles(state, dt); // travel + lifetime
+      updateCollision(state); // projectile↔enemy, damage, deaths, damage numbers
+      updateDamageNumbers(state, dt); // float + fade + expire
       state.time += dt;
       state.tick++;
     },

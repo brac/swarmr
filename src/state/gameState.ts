@@ -7,6 +7,8 @@
 import { Rng } from "../core/rng";
 import { SpatialHash } from "../core/spatialHash";
 import { Enemies } from "./enemies";
+import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
+import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
 import { ENEMY } from "../data/enemies";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
@@ -36,7 +38,9 @@ export interface GameState {
   player: Player;
   hash: SpatialHash;
   enemies: Enemies;
-  // Projectiles + damage numbers land here as combat goes in.
+  projectiles: Projectiles;
+  damageNumbers: DamageNumbers;
+  daggerTimer: number; // seconds until the Dagger may fire again
 }
 
 export function createGameState(seed: number): GameState {
@@ -49,7 +53,10 @@ export function createGameState(seed: number): GameState {
       speed: 300,
       radius: 16,
     },
-    hash: new SpatialHash(HASH_CELL_SIZE),
+    hash: new SpatialHash(HASH_CELL_SIZE, WORLD_W, WORLD_H, ENEMY.capacity),
     enemies: new Enemies(ENEMY.capacity),
+    projectiles: new Projectiles(PROJECTILE_CAPACITY),
+    damageNumbers: new DamageNumbers(DAMAGE_NUMBER_CAPACITY),
+    daggerTimer: 0,
   };
 }
