@@ -64,6 +64,7 @@ export function updateCollision(state: GameState): void {
   for (let i = e.count - 1; i >= 0; i--) {
     if (e.hp[i]! <= 0) {
       state.gems.spawn(e.posX[i]!, e.posY[i]!, e.xpValue[i]!);
+      state.kills++;
       e.kill(i);
     }
   }

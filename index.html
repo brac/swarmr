@@ -68,9 +68,31 @@
         pointer-events: none;
         user-select: none;
       }
-      #hud {
+      #stats {
         position: fixed;
         top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 11;
+        text-align: center;
+        pointer-events: none;
+        user-select: none;
+      }
+      #timer {
+        font-size: 26px;
+        font-weight: bold;
+        color: #f2f4f8;
+        text-shadow: 0 1px 3px #000;
+        letter-spacing: 1px;
+      }
+      #kills {
+        font-size: 13px;
+        color: #aab2c5;
+        text-shadow: 0 1px 2px #000;
+      }
+      #hud {
+        position: fixed;
+        top: 62px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
@@ -203,6 +225,10 @@
     <div id="perf"></div>
     <div id="xpbar"><div id="xpfill"></div></div>
     <div id="level">LV 1</div>
+    <div id="stats">
+      <div id="timer">0:00</div>
+      <div id="kills">0 kills</div>
+    </div>
     <div id="hud">
       <div id="hpbar">
         <div id="hpfill"></div>

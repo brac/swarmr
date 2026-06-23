@@ -34,6 +34,8 @@ async function main(): Promise<void> {
   const hpTextEl = document.getElementById("hptext");
   const xpFillEl = document.getElementById("xpfill");
   const levelEl = document.getElementById("level");
+  const timerEl = document.getElementById("timer");
+  const killsEl = document.getElementById("kills");
   const deathEl = document.getElementById("death");
   const upgradesEl = document.getElementById("upgrades");
   if (
@@ -43,10 +45,12 @@ async function main(): Promise<void> {
     !hpTextEl ||
     !xpFillEl ||
     !levelEl ||
+    !timerEl ||
+    !killsEl ||
     !deathEl ||
     !upgradesEl
   ) {
-    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#death/#upgrades)");
+    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#stats/#death/#upgrades)");
   }
 
   // Reassignable: restart swaps in a brand-new world. The loop/listener closures
@@ -82,6 +86,7 @@ async function main(): Promise<void> {
   const hud = new Hud(
     { fill: hpFillEl, text: hpTextEl },
     { fill: xpFillEl, level: levelEl },
+    { timer: timerEl, kills: killsEl },
     deathEl,
   );
 

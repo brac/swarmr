@@ -47,8 +47,9 @@ export interface Player {
 
 export interface GameState {
   rng: Rng;
-  time: number; // accumulated sim seconds
+  time: number; // accumulated sim seconds (the survival timer)
   tick: number; // total logic ticks elapsed
+  kills: number; // enemies killed this run
   player: Player;
   hash: SpatialHash;
   enemies: Enemies;
@@ -72,6 +73,7 @@ export function createGameState(seed: number): GameState {
     rng: new Rng(seed),
     time: 0,
     tick: 0,
+    kills: 0,
     player: {
       pos: { x: WORLD_W / 2, y: WORLD_H / 2 },
       speed: PLAYER.speed,

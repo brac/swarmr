@@ -12,6 +12,8 @@ export class Hud {
   private hpText: HTMLElement;
   private xpFill: HTMLElement;
   private levelText: HTMLElement;
+  private timerText: HTMLElement;
+  private killsText: HTMLElement;
   private death: HTMLElement;
 
   private accum = UPDATE_INTERVAL; // draw on the first frame
@@ -19,17 +21,22 @@ export class Hud {
   private lastXpPct = NaN;
   private lastLevel = -1;
   private lastLeveling = true;
+  private lastSeconds = -1;
+  private lastKills = -1;
   private lastGameOver = false;
 
   constructor(
     hp: { fill: HTMLElement; text: HTMLElement },
     xp: { fill: HTMLElement; level: HTMLElement },
+    stats: { timer: HTMLElement; kills: HTMLElement },
     death: HTMLElement,
   ) {
     this.hpFill = hp.fill;
     this.hpText = hp.text;
     this.xpFill = xp.fill;
     this.levelText = xp.level;
+    this.timerText = stats.timer;
+    this.killsText = stats.kills;
     this.death = death;
   }
 
@@ -53,6 +60,19 @@ export class Hud {
     if (xpPct !== this.lastXpPct) {
       this.xpFill.style.width = xpPct * 100 + "%";
       this.lastXpPct = xpPct;
+    }
+
+    const seconds = Math.floor(state.time);
+    if (seconds !== this.lastSeconds) {
+      const mm = Math.floor(seconds / 60);
+      const ss = seconds % 60;
+      this.timerText.textContent = mm + ":" + (ss < 10 ? "0" : "") + ss;
+      this.lastSeconds = seconds;
+    }
+
+    if (state.kills !== this.lastKills) {
+      this.killsText.textContent = state.kills + " kills";
+      this.lastKills = state.kills;
     }
 
     if (p.level !== this.lastLevel || state.levelingEnabled !== this.lastLeveling) {
