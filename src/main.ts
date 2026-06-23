@@ -9,6 +9,8 @@ import { createGameState } from "./state/gameState";
 import { Renderer } from "./views/renderer";
 import { PerfOverlay } from "./views/perfOverlay";
 import { Hud } from "./views/hud";
+import { UpgradeMenu } from "./views/upgradeMenu";
+import { rollUpgrades } from "./systems/upgrades";
 import { updateSpawn } from "./systems/spawn";
 import { updatePlayer, updateEnemies } from "./systems/movement";
 import { rebuildHash } from "./systems/broadphase";
@@ -32,6 +34,7 @@ async function main(): Promise<void> {
   const xpFillEl = document.getElementById("xpfill");
   const levelEl = document.getElementById("level");
   const deathEl = document.getElementById("death");
+  const upgradesEl = document.getElementById("upgrades");
   if (
     !appEl ||
     !perfEl ||
@@ -39,9 +42,10 @@ async function main(): Promise<void> {
     !hpTextEl ||
     !xpFillEl ||
     !levelEl ||
-    !deathEl
+    !deathEl ||
+    !upgradesEl
   ) {
-    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#death)");
+    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#death/#upgrades)");
   }
 
   // Reassignable: restart swaps in a brand-new world. The loop/listener closures
@@ -73,9 +77,17 @@ async function main(): Promise<void> {
     deathEl,
   );
 
+  // Picking an upgrade applies it and clears one queued level-up. If more remain,
+  // the render loop re-opens the menu next frame with a fresh roll.
+  const upgradeMenu = new UpgradeMenu(upgradesEl, (u) => {
+    u.apply(state);
+    state.levelUpsPending--;
+  });
+
   const loop = new Loop({
     update: (dt) => {
       if (state.gameOver) return; // freeze the sim; only restart can revive it
+      if (state.levelUpsPending > 0) return; // paused while choosing an upgrade
 
       updateSpawn(state); // ramp the swarm to target
       updatePlayer(state, input, dt); // WASD
@@ -98,6 +110,10 @@ async function main(): Promise<void> {
       renderer.render(state, alpha);
       overlay.update(loop, 1 / 60, state.enemies.count);
       hud.update(state, 1 / 60);
+      // Open the upgrade menu for each queued level-up (sim is paused meanwhile).
+      if (!state.gameOver && state.levelUpsPending > 0 && !upgradeMenu.isOpen()) {
+        upgradeMenu.show(rollUpgrades(state.rng, 3));
+      }
     },
   });
 

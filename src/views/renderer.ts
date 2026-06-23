@@ -296,8 +296,10 @@ export class Renderer {
       this.shownGod = state.godMode;
     }
 
-    // Garlic aura follows the player; gentle alpha pulse to read as "active".
+    // Garlic aura follows the player; scales with the (upgradeable) radius and
+    // pulses its alpha to read as "active".
     this.garlicAura.position.set(p.pos.x, p.pos.y);
+    this.garlicAura.scale.set(state.weapons.garlic.radius / GARLIC.radius);
     this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
 
     const e = state.enemies;

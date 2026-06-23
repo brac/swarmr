@@ -128,6 +128,74 @@
         font-size: 16px;
         color: #cdd3df;
       }
+      #upgrades {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: rgba(0, 0, 0, 0.72);
+        pointer-events: auto;
+        user-select: none;
+      }
+      .up-title {
+        font-size: 26px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #ffd86b;
+        text-shadow: 0 1px 3px #000;
+      }
+      .up-row {
+        display: flex;
+        gap: 18px;
+      }
+      .up-card {
+        width: 220px;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px 16px;
+        background: #161a24;
+        border: 2px solid #2a3142;
+        border-radius: 10px;
+        cursor: pointer;
+        color: #e6ebf5;
+        font-family: inherit;
+        transition: border-color 0.1s, background 0.1s, transform 0.1s;
+      }
+      .up-card:hover {
+        border-color: #9b6bff;
+        background: #1d2433;
+        transform: translateY(-3px);
+      }
+      .up-num {
+        width: 26px;
+        height: 26px;
+        line-height: 26px;
+        text-align: center;
+        border-radius: 50%;
+        background: #2a3142;
+        color: #bcd6ff;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .up-name {
+        font-size: 19px;
+        font-weight: bold;
+        color: #bcd6ff;
+      }
+      .up-desc {
+        font-size: 13px;
+        color: #aab2c5;
+        text-align: center;
+        line-height: 1.4;
+      }
     </style>
   </head>
   <body>
@@ -145,6 +213,7 @@
       <div class="title">YOU DIED</div>
       <div class="hint">press R to restart</div>
     </div>
+    <div id="upgrades"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -33,8 +33,9 @@ export function updateGems(state: GameState, dt: number): void {
   }
 }
 
-// Add XP and resolve any level-ups (carrying overflow). Each level heals a bit
-// and fires the level-up flash; the upgrade picker lands on top of this later.
+// Add XP and resolve any level-ups (carrying overflow). Each level queues an
+// upgrade choice (which pauses the sim) and fires the level-up flash. Multiple
+// levels from one big haul queue multiple choices, resolved one at a time.
 function addXp(state: GameState, amount: number): void {
   const p = state.player;
   p.xp += amount;
@@ -42,7 +43,7 @@ function addXp(state: GameState, amount: number): void {
     p.xp -= p.xpToNext;
     p.level++;
     p.xpToNext = xpToNext(p.level);
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * LEVEL.upHeal);
+    state.levelUpsPending++;
     state.levelUpTimer = LEVEL.upFlashTime;
   }
 }

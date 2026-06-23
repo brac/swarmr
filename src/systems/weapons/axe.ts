@@ -12,6 +12,7 @@ import { AXE } from "../../data/weapons";
 import { PROJ_AXE, PIERCE_INFINITE } from "../../state/projectiles";
 
 export function updateAxe(state: GameState, dt: number): void {
+  const w = state.weapons.axe;
   state.axeTimer -= dt;
   if (state.axeTimer > 0) return;
 
@@ -29,12 +30,12 @@ export function updateAxe(state: GameState, dt: number): void {
       -AXE.launchSpeedY, // launch upward
       AXE.lifetime,
       AXE.radius,
-      AXE.damage,
+      w.damage,
       PIERCE_INFINITE, // carve through every enemy until off-screen
       AXE.gravity,
       PROJ_AXE,
     );
   }
 
-  state.axeTimer += AXE.cooldown;
+  state.axeTimer += w.cooldown;
 }

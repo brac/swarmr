@@ -1,7 +1,7 @@
 // Dagger — the first weapon, and the whole combat backbone: it forces the
 // projectile pool, the spatial-hash targeting query, and (via collision) damage
-// numbers into existence. Auto-fires on cooldown at the nearest enemy.
-// See docs/02-dagger.md.
+// numbers into existence. Auto-fires on cooldown at the nearest enemy. When
+// upgraded to fire multiple, they fan out around the aim. See docs/02-dagger.md.
 
 import type { GameState } from "../../state/gameState";
 import { DAGGER } from "../../data/weapons";
@@ -9,6 +9,7 @@ import { PROJ_DAGGER } from "../../state/projectiles";
 import { nearestEnemy } from "../targeting";
 
 export function updateDagger(state: GameState, dt: number): void {
+  const w = state.weapons.dagger;
   state.daggerTimer -= dt;
   if (state.daggerTimer > 0) return;
 
@@ -25,24 +26,24 @@ export function updateDagger(state: GameState, dt: number): void {
   const e = state.enemies;
   const dx = e.posX[target]! - px;
   const dy = e.posY[target]! - py;
-  const inv = 1 / Math.sqrt(dx * dx + dy * dy || 1);
-  const vx = dx * inv * DAGGER.projectileSpeed;
-  const vy = dy * inv * DAGGER.projectileSpeed;
+  const base = Math.atan2(dy, dx);
 
-  for (let c = 0; c < DAGGER.count; c++) {
+  // Fan multiple daggers symmetrically around the aim.
+  for (let c = 0; c < w.count; c++) {
+    const angle = base + (c - (w.count - 1) / 2) * DAGGER.spread;
     state.projectiles.spawn(
       px,
       py,
-      vx,
-      vy,
+      Math.cos(angle) * DAGGER.projectileSpeed,
+      Math.sin(angle) * DAGGER.projectileSpeed,
       DAGGER.projectileLifetime,
       DAGGER.projectileRadius,
-      DAGGER.damage,
+      w.damage,
       DAGGER.pierce,
       0, // no gravity — straight-line
       PROJ_DAGGER,
     );
   }
 
-  state.daggerTimer += DAGGER.cooldown;
+  state.daggerTimer += w.cooldown;
 }

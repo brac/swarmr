@@ -8,7 +8,8 @@ export const DAGGER = {
   projectileLifetime: 1.5, // seconds
   projectileRadius: 6,
   pierce: 1, // enemies one projectile passes through before despawning
-  count: 1, // projectiles per fire (level-up territory later)
+  count: 1, // projectiles per fire (default; upgrades raise it)
+  spread: 0.13, // fan angle between daggers when count > 1 (rad)
 } as const;
 
 // Whip — a fixed-arc melee cleave, no projectile. On cooldown it sweeps a wedge

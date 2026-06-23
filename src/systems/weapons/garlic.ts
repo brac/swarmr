@@ -20,16 +20,17 @@ export function updateGarlic(state: GameState): void {
   const e = state.enemies;
   if (e.count === 0) return;
 
+  const g = state.weapons.garlic;
   const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
   const now = state.time;
-  const r2 = GARLIC.radius * GARLIC.radius;
+  const r2 = g.radius * g.radius;
 
-  const cxLo = h.clampCX(px - GARLIC.radius);
-  const cxHi = h.clampCX(px + GARLIC.radius);
-  const cyLo = h.clampCY(py - GARLIC.radius);
-  const cyHi = h.clampCY(py + GARLIC.radius);
+  const cxLo = h.clampCX(px - g.radius);
+  const cxHi = h.clampCX(px + g.radius);
+  const cyLo = h.clampCY(py - g.radius);
+  const cyHi = h.clampCY(py + g.radius);
 
   const posX = e.posX;
   const posY = e.posY;
@@ -54,7 +55,7 @@ export function updateGarlic(state: GameState): void {
         const dy = posY[j]! - py;
         if (dx * dx + dy * dy > r2) continue; // outside the aura
 
-        const roll = rollHit(state.rng, GARLIC.damage);
+        const roll = rollHit(state.rng, g.damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(

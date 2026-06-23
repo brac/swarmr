@@ -11,6 +11,8 @@ import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
 import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
 import { WhipStrikes, WHIP_STRIKE_CAPACITY } from "./whipStrikes";
 import { Gems } from "./gems";
+import type { WeaponState } from "./weapons";
+import { createWeaponState } from "./weapons";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
 import { XP, xpToNext } from "../data/xp";
@@ -57,7 +59,9 @@ export interface GameState {
   axeTimer: number; // seconds until the Axe may throw again
   whipStrikes: WhipStrikes; // lingering swing visuals
   gems: Gems; // XP drops
+  weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
   levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
+  levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
   godMode: boolean; // debug: ignore contact damage (toggle with L)
 }
@@ -89,7 +93,9 @@ export function createGameState(seed: number): GameState {
     axeTimer: 0,
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
     gems: new Gems(XP.capacity),
+    weapons: createWeaponState(),
     levelUpTimer: 0,
+    levelUpsPending: 0,
     gameOver: false,
     godMode: false,
   };

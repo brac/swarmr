@@ -23,6 +23,7 @@ export function updateWhip(state: GameState, dt: number): void {
     if (ws.age[i]! >= WHIP.strikeTTL) ws.kill(i);
   }
 
+  const wstat = state.weapons.whip;
   state.whipTimer -= dt;
   if (state.whipTimer > 0) return;
 
@@ -79,7 +80,7 @@ export function updateWhip(state: GameState, dt: number): void {
         const invd = 1 / Math.sqrt(d2);
         if ((dx * ux + dy * uy) * invd < cosHalf) continue;
 
-        const roll = rollHit(state.rng, WHIP.damage);
+        const roll = rollHit(state.rng, wstat.damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(
@@ -93,5 +94,5 @@ export function updateWhip(state: GameState, dt: number): void {
   }
 
   ws.spawn(px, py, angle); // lingering visual; collision compacts the dead later
-  state.whipTimer += WHIP.cooldown;
+  state.whipTimer += wstat.cooldown;
 }
