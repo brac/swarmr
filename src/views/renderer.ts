@@ -15,9 +15,10 @@ import type { Texture } from "pixi.js";
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
-import { DAGGER } from "../data/weapons";
+import { DAGGER, WHIP } from "../data/weapons";
 import { PROJECTILE_CAPACITY } from "../state/projectiles";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
+import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
 
 // Where inactive pooled particles sit — well outside the 1920x1080 world so they
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
@@ -41,6 +42,13 @@ export class Renderer {
   private projContainer!: ParticleContainer;
   private projParticles: Particle[] = [];
   private projHigh = 0;
+
+  // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
+  // aim (pointing +x). Per active strike we set position/rotation/alpha — no
+  // per-frame geometry rebuild. Inactive ones are hidden.
+  private whipLayer = new Container();
+  private whipGraphics: Graphics[] = [];
+  private whipHigh = 0;
 
   // Damage numbers: pooled BitmapText (one shared dynamic bitmap font → batched
   // glyphs, no per-number texture allocation). `shownValue` lets us skip glyph
@@ -101,6 +109,20 @@ export class Renderer {
     this.projContainer = proj.container;
     this.projParticles = proj.particles;
 
+    // Pooled whip wedges. Each draws the same sector once (apex at origin,
+    // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
+    // place + rotate + fade one.
+    for (let i = 0; i < WHIP_STRIKE_CAPACITY; i++) {
+      const g = new Graphics();
+      g.moveTo(0, 0)
+        .arc(0, 0, WHIP.range, -WHIP.arcHalfAngle, WHIP.arcHalfAngle)
+        .lineTo(0, 0)
+        .fill({ color: 0xbfe3ff, alpha: 0.22 });
+      g.visible = false;
+      this.whipGraphics.push(g);
+      this.whipLayer.addChild(g);
+    }
+
     // Pooled damage-number text objects (hidden until used).
     for (let i = 0; i < DAMAGE_NUMBER_CAPACITY; i++) {
       const bt = new BitmapText({
@@ -119,10 +141,11 @@ export class Renderer {
       this.dnLayer.addChild(bt);
     }
 
-    // Draw order: backdrop, swarm, projectiles, damage numbers, player on top.
+    // Draw order: backdrop, swarm, whip arcs, projectiles, numbers, player on top.
     this.world.addChild(
       frame,
       this.enemyContainer,
+      this.whipLayer,
       this.projContainer,
       this.dnLayer,
       this.playerDot,
@@ -150,7 +173,11 @@ export class Renderer {
 
   /** Read state, position views, render one frame. No decisions here. */
   render(state: GameState, _alpha: number): void {
-    this.playerDot.position.set(state.player.pos.x, state.player.pos.y);
+    const p = state.player;
+    this.playerDot.position.set(p.pos.x, p.pos.y);
+    // Blink while invulnerable (i-frames) so a hit reads instantly; solid otherwise.
+    this.playerDot.alpha =
+      p.invuln > 0 && ((p.invuln * 20) | 0) % 2 === 0 ? 0.35 : 1;
 
     const e = state.enemies;
     this.enemyHigh = this.syncParticles(
@@ -169,6 +196,20 @@ export class Renderer {
       pr.posX,
       pr.posY,
     );
+
+    // Whip strikes: place/rotate/fade each active wedge; hide the rest.
+    const ws = state.whipStrikes;
+    const wg = this.whipGraphics;
+    const wn = ws.count;
+    for (let i = 0; i < wn; i++) {
+      const g = wg[i]!;
+      g.position.set(ws.posX[i]!, ws.posY[i]!);
+      g.rotation = ws.angle[i]!;
+      g.alpha = 1 - ws.age[i]! / WHIP.strikeTTL;
+      g.visible = true;
+    }
+    for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
+    this.whipHigh = wn;
 
     // Damage numbers: position + fade by age; set text only when a slot's value
     // changed (swap-remove can move a different number into a slot).

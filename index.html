@@ -40,11 +40,81 @@
         pointer-events: none;
         user-select: none;
       }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        pointer-events: none;
+        user-select: none;
+      }
+      #hpbar {
+        position: relative;
+        width: 360px;
+        height: 22px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      #hpfill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background: #2fbf5a;
+      }
+      #hptext {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 0 1px 2px #000;
+      }
+      #death {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #ff6b6b;
+        pointer-events: none;
+        user-select: none;
+      }
+      #death .title {
+        font-size: 48px;
+        font-weight: bold;
+        letter-spacing: 4px;
+      }
+      #death .hint {
+        font-size: 16px;
+        color: #cdd3df;
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="perf"></div>
+    <div id="hud">
+      <div id="hpbar">
+        <div id="hpfill"></div>
+        <div id="hptext"></div>
+      </div>
+    </div>
+    <div id="death">
+      <div class="title">YOU DIED</div>
+      <div class="hint">press R to restart</div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

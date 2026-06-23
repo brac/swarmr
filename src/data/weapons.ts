@@ -10,3 +10,15 @@ export const DAGGER = {
   pierce: 1, // enemies one projectile passes through before despawning
   count: 1, // projectiles per fire (level-up territory later)
 } as const;
+
+// Whip — a fixed-arc melee cleave, no projectile. On cooldown it sweeps a wedge
+// aimed at the nearest enemy and damages everyone inside it at once (area
+// overlap, not a moving entity). Instantaneous: one damage tick per swing, so no
+// per-enemy re-hit bookkeeping (that lesson is Garlic's). See CLAUDE.md build order.
+export const WHIP = {
+  cooldown: 1.1, // seconds between swings
+  damage: 14,
+  range: 230, // reach (px)
+  arcHalfAngle: 0.7, // half-width of the wedge (rad) → ~80° full arc
+  strikeTTL: 0.18, // how long the swing graphic lingers/fades (s)
+} as const;

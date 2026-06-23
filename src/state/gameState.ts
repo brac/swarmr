@@ -9,7 +9,9 @@ import { SpatialHash } from "../core/spatialHash";
 import { Enemies } from "./enemies";
 import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
 import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
+import { WhipStrikes, WHIP_STRIKE_CAPACITY } from "./whipStrikes";
 import { ENEMY } from "../data/enemies";
+import { PLAYER } from "../data/player";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
 // renderer letterboxes them to the actual viewport.
@@ -29,6 +31,9 @@ export interface Player {
   pos: Vec2;
   speed: number; // px/sec
   radius: number;
+  hp: number;
+  maxHp: number;
+  invuln: number; // seconds of remaining i-frames after a hit (0 = vulnerable)
 }
 
 export interface GameState {
@@ -41,6 +46,9 @@ export interface GameState {
   projectiles: Projectiles;
   damageNumbers: DamageNumbers;
   daggerTimer: number; // seconds until the Dagger may fire again
+  whipTimer: number; // seconds until the Whip may swing again
+  whipStrikes: WhipStrikes; // lingering swing visuals
+  gameOver: boolean; // player HP hit 0; the sim freezes until restart
 }
 
 export function createGameState(seed: number): GameState {
@@ -50,13 +58,19 @@ export function createGameState(seed: number): GameState {
     tick: 0,
     player: {
       pos: { x: WORLD_W / 2, y: WORLD_H / 2 },
-      speed: 300,
-      radius: 16,
+      speed: PLAYER.speed,
+      radius: PLAYER.radius,
+      hp: PLAYER.maxHp,
+      maxHp: PLAYER.maxHp,
+      invuln: 0,
     },
     hash: new SpatialHash(HASH_CELL_SIZE, WORLD_W, WORLD_H, ENEMY.capacity),
     enemies: new Enemies(ENEMY.capacity),
     projectiles: new Projectiles(PROJECTILE_CAPACITY),
     damageNumbers: new DamageNumbers(DAMAGE_NUMBER_CAPACITY),
     daggerTimer: 0,
+    whipTimer: 0,
+    whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
+    gameOver: false,
   };
 }
