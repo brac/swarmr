@@ -25,8 +25,10 @@ export class Audio {
   private muted = false;
 
   constructor() {
+    // BASE_URL respects Vite's base ("/" in dev, "/swarmr/" on GitHub Pages).
+    const base = import.meta.env.BASE_URL;
     const mk = (name: string, volume: number) =>
-      new Howl({ src: ["/sounds/" + name + ".wav"], volume });
+      new Howl({ src: [base + "sounds/" + name + ".wav"], volume });
     this.s = {
       pickup: mk("pickup", 0.25),
       hurt: mk("hurt", 0.5),
