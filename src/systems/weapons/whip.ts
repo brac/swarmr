@@ -11,7 +11,9 @@
 
 import type { GameState } from "../../state/gameState";
 import { WHIP } from "../../data/weapons";
+import { ENEMY } from "../../data/enemies";
 import { nearestEnemy } from "../targeting";
+import { rollHit } from "../combat";
 
 export function updateWhip(state: GameState, dt: number): void {
   // Age out lingering swing visuals every tick, independent of the cooldown.
@@ -55,6 +57,7 @@ export function updateWhip(state: GameState, dt: number): void {
   const posX = e.posX;
   const posY = e.posY;
   const hp = e.hp;
+  const hitTimer = e.hitTimer;
   const radius = e.radius;
   const cellStart = h.cellStart;
   const items = h.items;
@@ -76,8 +79,15 @@ export function updateWhip(state: GameState, dt: number): void {
         const invd = 1 / Math.sqrt(d2);
         if ((dx * ux + dy * uy) * invd < cosHalf) continue;
 
-        hp[j]! -= WHIP.damage;
-        state.damageNumbers.spawn(posX[j]!, posY[j]! - radius, WHIP.damage);
+        const roll = rollHit(state.rng, WHIP.damage);
+        hp[j]! -= roll.amount;
+        hitTimer[j] = ENEMY.hitReactTime;
+        state.damageNumbers.spawn(
+          posX[j]!,
+          posY[j]! - radius,
+          roll.amount,
+          roll.crit ? 1 : 0,
+        );
       }
     }
   }

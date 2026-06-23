@@ -12,6 +12,7 @@ export class Enemies {
   readonly posX: Float32Array;
   readonly posY: Float32Array;
   readonly hp: Float32Array;
+  readonly hitTimer: Float32Array; // seconds of hit-react (flash/wobble) remaining
 
   // Shared across the one enemy type for now; becomes per-entity if types diverge.
   readonly radius = ENEMY.radius;
@@ -22,6 +23,7 @@ export class Enemies {
     this.posX = new Float32Array(capacity);
     this.posY = new Float32Array(capacity);
     this.hp = new Float32Array(capacity);
+    this.hitTimer = new Float32Array(capacity);
   }
 
   /** Activate one enemy. Returns its index, or -1 if at capacity. */
@@ -31,6 +33,7 @@ export class Enemies {
     this.posX[i] = x;
     this.posY[i] = y;
     this.hp[i] = ENEMY.hp;
+    this.hitTimer[i] = 0;
     return i;
   }
 
@@ -44,5 +47,6 @@ export class Enemies {
     this.posX[i] = this.posX[last]!;
     this.posY[i] = this.posY[last]!;
     this.hp[i] = this.hp[last]!;
+    this.hitTimer[i] = this.hitTimer[last]!;
   }
 }

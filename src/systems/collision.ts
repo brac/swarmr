@@ -7,6 +7,8 @@
 // the hash's enemy indices valid throughout the pass — no index shifts mid-loop.
 
 import type { GameState } from "../state/gameState";
+import { ENEMY } from "../data/enemies";
+import { rollHit } from "./combat";
 
 const candidates: number[] = []; // reused scratch — never per-query alloc
 
@@ -32,10 +34,16 @@ export function updateCollision(state: GameState): void {
       const rr = pr + e.radius;
       if (dx * dx + dy * dy > rr * rr) continue;
 
-      // Hit.
-      const dmg = proj.damage[p]!;
-      e.hp[ei]! -= dmg;
-      state.damageNumbers.spawn(e.posX[ei]!, e.posY[ei]! - e.radius, dmg);
+      // Hit: roll variance + crit, apply, flash, pop a number.
+      const roll = rollHit(state.rng, proj.damage[p]!);
+      e.hp[ei]! -= roll.amount;
+      e.hitTimer[ei] = ENEMY.hitReactTime;
+      state.damageNumbers.spawn(
+        e.posX[ei]!,
+        e.posY[ei]! - e.radius,
+        roll.amount,
+        roll.crit ? 1 : 0,
+      );
 
       if (--proj.pierce[p]! <= 0) {
         proj.kill(p);

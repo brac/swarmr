@@ -13,6 +13,7 @@ export class DamageNumbers {
   readonly posY: Float32Array;
   readonly value: Int32Array;
   readonly age: Float32Array; // seconds since spawn
+  readonly crit: Uint8Array; // 1 = crit (rendered larger + red), 0 = normal
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -20,9 +21,10 @@ export class DamageNumbers {
     this.posY = new Float32Array(capacity);
     this.value = new Int32Array(capacity);
     this.age = new Float32Array(capacity);
+    this.crit = new Uint8Array(capacity);
   }
 
-  spawn(x: number, y: number, value: number): number {
+  spawn(x: number, y: number, value: number, crit: number): number {
     // Oldest-drops behavior if we ever flood: just bail when full.
     if (this.count >= this.capacity) return -1;
     const i = this.count++;
@@ -30,6 +32,7 @@ export class DamageNumbers {
     this.posY[i] = y;
     this.value[i] = value;
     this.age[i] = 0;
+    this.crit[i] = crit;
     return i;
   }
 
@@ -40,5 +43,6 @@ export class DamageNumbers {
     this.posY[i] = this.posY[last]!;
     this.value[i] = this.value[last]!;
     this.age[i] = this.age[last]!;
+    this.crit[i] = this.crit[last]!;
   }
 }

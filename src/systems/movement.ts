@@ -44,6 +44,7 @@ export function updateEnemies(state: GameState, dt: number): void {
   // and the j>=n guard skips any that are now out of the active range.
   const posX = e.posX;
   const posY = e.posY;
+  const hitTimer = e.hitTimer;
   const cellStart = h.cellStart;
   const items = h.items;
   const gridW = h.gridW;
@@ -52,6 +53,10 @@ export function updateEnemies(state: GameState, dt: number): void {
   for (let i = 0; i < n; i++) {
     const ex = posX[i]!;
     const ey = posY[i]!;
+
+    // Decay the hit-react timer (drives the renderer's flash + scale punch).
+    const ht = hitTimer[i]!;
+    if (ht > 0) hitTimer[i] = ht > dt ? ht - dt : 0;
 
     // Seek the player as a unit vector × speed.
     let vx = px - ex;

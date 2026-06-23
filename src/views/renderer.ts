@@ -24,6 +24,37 @@ import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
 const OFFSCREEN = -10000;
 
+// Crit damage numbers: bigger and red so they read instantly over the swarm.
+const DN_CRIT_COLOR = 0xff4040;
+const DN_CRIT_SCALE = 1.6;
+
+/**
+ * Pack an 0xRRGGBB color (with full alpha) into Particle.color's wire format:
+ * 0xAABBGGRR. We write `particle.color` directly rather than `particle.tint`,
+ * because the tint setter runs Color.shared.setValue() — which allocates, and at
+ * 2,000 enemies × 60fps that churn is what turns the heap into a sawtooth.
+ */
+function packParticleColor(rgb: number): number {
+  const r = (rgb >> 16) & 0xff;
+  const g = (rgb >> 8) & 0xff;
+  const b = rgb & 0xff;
+  return (0xff << 24) | (b << 16) | (g << 8) | r;
+}
+
+/**
+ * Lerp two 0xRRGGBB colors and return the result already packed for
+ * Particle.color (0xAABBGGRR, full alpha). t=0 → a, t=1 → b. Allocation-free.
+ */
+function lerpParticleColor(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff;
+  const ag = (a >> 8) & 0xff;
+  const ab = a & 0xff;
+  const r = (ar + (((b >> 16) & 0xff) - ar) * t) | 0;
+  const g = (ag + (((b >> 8) & 0xff) - ag) * t) | 0;
+  const bl = (ab + ((b & 0xff) - ab) * t) | 0;
+  return (0xff << 24) | (bl << 16) | (g << 8) | r;
+}
+
 export class Renderer {
   readonly app = new Application();
   /** Everything in world space lives under here; we scale/position it to fit. */
@@ -56,6 +87,7 @@ export class Renderer {
   private dnLayer = new Container();
   private dnTexts: BitmapText[] = [];
   private dnShownValue: number[] = [];
+  private dnShownCrit: number[] = []; // last-applied crit style per slot (gate tint/scale)
   private dnHigh = 0;
 
   async init(parent: HTMLElement): Promise<void> {
@@ -101,7 +133,13 @@ export class Renderer {
       new Graphics().circle(0, 0, DAGGER.projectileRadius).fill(0xffffff),
     );
 
-    const enemy = this.buildParticlePool(enemyTex, 0xff5566, ENEMY.capacity);
+    // Enemy pool: color + vertex dynamic so each enemy can flash and scale-punch
+    // on hit (position is always dynamic). Base tint comes from data.
+    const enemy = this.buildParticlePool(enemyTex, ENEMY.color, ENEMY.capacity, {
+      position: true,
+      color: true,
+      vertex: true,
+    });
     this.enemyContainer = enemy.container;
     this.enemyParticles = enemy.particles;
 
@@ -138,6 +176,7 @@ export class Renderer {
       bt.visible = false;
       this.dnTexts.push(bt);
       this.dnShownValue.push(-1);
+      this.dnShownCrit.push(-1);
       this.dnLayer.addChild(bt);
     }
 
@@ -180,13 +219,7 @@ export class Renderer {
       p.invuln > 0 && ((p.invuln * 20) | 0) % 2 === 0 ? 0.35 : 1;
 
     const e = state.enemies;
-    this.enemyHigh = this.syncParticles(
-      this.enemyParticles,
-      this.enemyHigh,
-      e.count,
-      e.posX,
-      e.posY,
-    );
+    this.enemyHigh = this.syncEnemies(e.count, e.posX, e.posY, e.hitTimer);
 
     const pr = state.projectiles;
     this.projHigh = this.syncParticles(
@@ -216,6 +249,7 @@ export class Renderer {
     const dn = state.damageNumbers;
     const texts = this.dnTexts;
     const shown = this.dnShownValue;
+    const shownCrit = this.dnShownCrit;
     const n = dn.count;
     for (let i = 0; i < n; i++) {
       const bt = texts[i]!;
@@ -227,6 +261,19 @@ export class Renderer {
       bt.x = dn.posX[i]!;
       bt.y = dn.posY[i]!;
       bt.alpha = 1 - dn.age[i]! / DN_TTL;
+      // Crits read bigger and red; normal hits stay white at base size. Gated:
+      // the tint setter parses a Color, so only touch it when the style changes.
+      const crit = dn.crit[i]!;
+      if (shownCrit[i] !== crit) {
+        if (crit === 1) {
+          bt.tint = DN_CRIT_COLOR;
+          bt.scale.set(DN_CRIT_SCALE);
+        } else {
+          bt.tint = 0xffffff;
+          bt.scale.set(1);
+        }
+        shownCrit[i] = crit;
+      }
       bt.visible = true;
     }
     for (let i = n; i < this.dnHigh; i++) texts[i]!.visible = false;
@@ -235,11 +282,19 @@ export class Renderer {
     this.app.renderer.render(this.app.stage);
   }
 
-  /** Build a pooled ParticleContainer: capacity particles parked off-screen. */
+  /**
+   * Build a pooled ParticleContainer: capacity particles parked off-screen.
+   * `dynamic` picks which per-particle buffers get re-uploaded each frame. The
+   * swarm enables color + vertex (for hit-flash tint and the scale punch); the
+   * projectile pool stays position-only and leaves the rest baked once.
+   */
   private buildParticlePool(
     tex: Texture,
     tint: number,
     capacity: number,
+    dynamic: { position?: boolean; color?: boolean; vertex?: boolean } = {
+      position: true,
+    },
   ): { container: ParticleContainer; particles: Particle[] } {
     const particles: Particle[] = [];
     for (let i = 0; i < capacity; i++) {
@@ -255,13 +310,56 @@ export class Renderer {
       );
     }
     const container = new ParticleContainer({
-      dynamicProperties: { position: true },
+      dynamicProperties: dynamic,
       texture: tex,
       particles,
     });
-    // Build static buffers (scale/uvs/color) once, else quads render zero-size.
+    // Build static buffers once, else quads render zero-size.
     container.update();
     return { container, particles };
+  }
+
+  /**
+   * Sync the swarm particles: position always, plus hit-react flash (tint lerps
+   * from the flash color back to base) and a scale punch, both driven by each
+   * enemy's hitTimer. Parks the rest off-screen. Returns the new high-water mark.
+   */
+  private syncEnemies(
+    count: number,
+    posX: Float32Array,
+    posY: Float32Array,
+    hitTimer: Float32Array,
+  ): number {
+    const particles = this.enemyParticles;
+    const base = ENEMY.color;
+    const flash = ENEMY.hitFlashColor;
+    const basePacked = packParticleColor(base); // precompute the no-flash color once
+    const reactInv = 1 / ENEMY.hitReactTime;
+    const wobble = ENEMY.hitWobble;
+
+    for (let i = 0; i < count; i++) {
+      const p = particles[i]!;
+      p.x = posX[i]!;
+      p.y = posY[i]!;
+      const ht = hitTimer[i]!;
+      if (ht > 0) {
+        const t = ht * reactInv; // 1 at impact → 0 as it decays
+        p.color = lerpParticleColor(base, flash, t);
+        const s = 1 + wobble * t;
+        p.scaleX = s;
+        p.scaleY = s;
+      } else {
+        p.color = basePacked;
+        p.scaleX = 1;
+        p.scaleY = 1;
+      }
+    }
+    for (let i = count; i < this.enemyHigh; i++) {
+      const p = particles[i]!;
+      p.x = OFFSCREEN;
+      p.y = OFFSCREEN;
+    }
+    return count;
   }
 
   /**
