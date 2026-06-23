@@ -1,10 +1,14 @@
 # swarmr
 
+### ▶ [Play it now](https://brac.github.io/swarmr/)
+
 A browser-based **bullet-heaven survivor** — dodge a swarm of 2,000+ enemies, auto-fire four weapons, level up, build your character, and survive ten minutes to face the boss. Built with PixiJS v8 and TypeScript; no game engine.
 
 The genre is light on rendering and heavy on entity throughput, so swarmr is built as a **systems problem, not a graphics problem**: a fixed-timestep simulation over structure-of-arrays entity pools, a uniform-grid spatial hash, and zero per-frame allocation in the hot path. It holds **2,000 enemies at frame budget** (≈2 ms logic / <1 ms render) with a flat heap.
 
 ## Play
+
+**[brac.github.io/swarmr](https://brac.github.io/swarmr/)** — runs in any modern browser, no install.
 
 1. **Move** with `WASD` or the arrow keys. That's the only control — every weapon auto-fires.
 2. **Collect** the cyan XP gems enemies drop (they magnet toward you).
