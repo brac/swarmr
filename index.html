@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>swarmr</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+      }
+      #app canvas {
+        display: block;
+      }
+      #perf {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.35;
+        color: #8fff8f;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(143, 255, 143, 0.25);
+        border-radius: 4px;
+        white-space: pre;
+        pointer-events: none;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="perf"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
