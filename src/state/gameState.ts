@@ -6,16 +6,17 @@
 
 import { Rng } from "../core/rng";
 import { SpatialHash } from "../core/spatialHash";
+import { Enemies } from "./enemies";
+import { ENEMY } from "../data/enemies";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
 // renderer letterboxes them to the actual viewport.
 export const WORLD_W = 1920;
 export const WORLD_H = 1080;
 
-// 2x the planned enemy collision radius is a reasonable starting cell size
+// 2x the enemy collision radius is a reasonable starting cell size
 // (see docs/03-spatial-hash.md). Tunable; profile once enemies exist.
-const ENEMY_RADIUS = 12;
-const HASH_CELL_SIZE = ENEMY_RADIUS * 2;
+const HASH_CELL_SIZE = ENEMY.radius * 2;
 
 export interface Vec2 {
   x: number;
@@ -34,7 +35,8 @@ export interface GameState {
   tick: number; // total logic ticks elapsed
   player: Player;
   hash: SpatialHash;
-  // Flat entity arrays land here in Phase 1 (enemies, projectiles, damage nums).
+  enemies: Enemies;
+  // Projectiles + damage numbers land here as combat goes in.
 }
 
 export function createGameState(seed: number): GameState {
@@ -48,5 +50,6 @@ export function createGameState(seed: number): GameState {
       radius: 16,
     },
     hash: new SpatialHash(HASH_CELL_SIZE),
+    enemies: new Enemies(ENEMY.capacity),
   };
 }
