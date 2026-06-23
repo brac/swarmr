@@ -19,6 +19,7 @@ import { updateGarlic } from "./systems/weapons/garlic";
 import { updateAxe } from "./systems/weapons/axe";
 import { updateProjectiles } from "./systems/projectiles";
 import { updateCollision } from "./systems/collision";
+import { updateGems } from "./systems/gems";
 import { updateDamageNumbers } from "./systems/damageNumbers";
 
 const SEED = 0x5eed; // fixed seed → reproducible runs (debugging)
@@ -28,9 +29,19 @@ async function main(): Promise<void> {
   const perfEl = document.getElementById("perf");
   const hpFillEl = document.getElementById("hpfill");
   const hpTextEl = document.getElementById("hptext");
+  const xpFillEl = document.getElementById("xpfill");
+  const levelEl = document.getElementById("level");
   const deathEl = document.getElementById("death");
-  if (!appEl || !perfEl || !hpFillEl || !hpTextEl || !deathEl) {
-    throw new Error("missing required DOM element (#app/#perf/#hud/#death)");
+  if (
+    !appEl ||
+    !perfEl ||
+    !hpFillEl ||
+    !hpTextEl ||
+    !xpFillEl ||
+    !levelEl ||
+    !deathEl
+  ) {
+    throw new Error("missing required DOM element (#app/#perf/#hud/#xp/#death)");
   }
 
   // Reassignable: restart swaps in a brand-new world. The loop/listener closures
@@ -56,7 +67,11 @@ async function main(): Promise<void> {
   await renderer.init(appEl);
 
   const overlay = new PerfOverlay(perfEl);
-  const hud = new Hud({ fill: hpFillEl, text: hpTextEl }, deathEl);
+  const hud = new Hud(
+    { fill: hpFillEl, text: hpTextEl },
+    { fill: xpFillEl, level: levelEl },
+    deathEl,
+  );
 
   const loop = new Loop({
     update: (dt) => {
@@ -72,15 +87,17 @@ async function main(): Promise<void> {
       updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)
       updateAxe(state, dt); // lob gravity axes upward (pooled projectiles)
       updateProjectiles(state, dt); // travel + lifetime (gravity arcs the axes)
-      updateCollision(state); // projectile↔enemy, damage, deaths, damage numbers
+      updateCollision(state); // projectile↔enemy, damage, deaths, gem drops
+      updateGems(state, dt); // magnet + pickup + leveling
       updateDamageNumbers(state, dt); // float + fade + expire
+      if (state.levelUpTimer > 0) state.levelUpTimer -= dt;
       state.time += dt;
       state.tick++;
     },
     render: (alpha) => {
       renderer.render(state, alpha);
       overlay.update(loop, 1 / 60, state.enemies.count);
-      hud.update(state);
+      hud.update(state, 1 / 60);
     },
   });
 

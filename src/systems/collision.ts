@@ -9,6 +9,7 @@
 import type { GameState } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { COMBAT } from "../data/combat";
+import { XP } from "../data/xp";
 import { PIERCE_INFINITE } from "../state/projectiles";
 import { rollHit } from "./combat";
 
@@ -59,8 +60,12 @@ export function updateCollision(state: GameState): void {
     }
   }
 
-  // Now compact out the dead. Downward + swap-remove keeps it O(deaths).
+  // Now compact out the dead. Downward + swap-remove keeps it O(deaths). Every
+  // death (from any weapon — they all funnel HP through here) drops an XP gem.
   for (let i = e.count - 1; i >= 0; i--) {
-    if (e.hp[i]! <= 0) e.kill(i);
+    if (e.hp[i]! <= 0) {
+      state.gems.spawn(e.posX[i]!, e.posY[i]!, XP.gemValue);
+      e.kill(i);
+    }
   }
 }

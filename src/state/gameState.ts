@@ -10,8 +10,10 @@ import { Enemies } from "./enemies";
 import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
 import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
 import { WhipStrikes, WHIP_STRIKE_CAPACITY } from "./whipStrikes";
+import { Gems } from "./gems";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
+import { XP, xpToNext } from "../data/xp";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
 // renderer letterboxes them to the actual viewport.
@@ -34,6 +36,11 @@ export interface Player {
   hp: number;
   maxHp: number;
   invuln: number; // seconds of remaining i-frames after a hit (0 = vulnerable)
+  xp: number; // XP banked toward the next level
+  level: number;
+  xpToNext: number; // XP needed to go from `level` to the next
+  pickupRadius: number; // gem collect distance (px)
+  magnetRadius: number; // gem homing distance (px)
 }
 
 export interface GameState {
@@ -49,6 +56,8 @@ export interface GameState {
   whipTimer: number; // seconds until the Whip may swing again
   axeTimer: number; // seconds until the Axe may throw again
   whipStrikes: WhipStrikes; // lingering swing visuals
+  gems: Gems; // XP drops
+  levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
   godMode: boolean; // debug: ignore contact damage (toggle with L)
 }
@@ -65,6 +74,11 @@ export function createGameState(seed: number): GameState {
       hp: PLAYER.maxHp,
       maxHp: PLAYER.maxHp,
       invuln: 0,
+      xp: 0,
+      level: 1,
+      xpToNext: xpToNext(1),
+      pickupRadius: XP.pickupRadius,
+      magnetRadius: XP.magnetRadius,
     },
     hash: new SpatialHash(HASH_CELL_SIZE, WORLD_W, WORLD_H, ENEMY.capacity),
     enemies: new Enemies(ENEMY.capacity),
@@ -74,6 +88,8 @@ export function createGameState(seed: number): GameState {
     whipTimer: 0,
     axeTimer: 0,
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
+    gems: new Gems(XP.capacity),
+    levelUpTimer: 0,
     gameOver: false,
     godMode: false,
   };

@@ -17,6 +17,7 @@ import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { DAGGER, WHIP, GARLIC } from "../data/weapons";
+import { XP, LEVEL } from "../data/xp";
 import type { Projectiles } from "../state/projectiles";
 import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
 import type { DamageNumbers } from "../state/damageNumbers";
@@ -87,6 +88,14 @@ export class Renderer {
   private axeContainer!: ParticleContainer;
   private axeParticles: Particle[] = [];
   private axeHigh = 0;
+
+  // XP gem layer: pooled particles, position-only dynamic, one shared gem texture.
+  private gemContainer!: ParticleContainer;
+  private gemParticles: Particle[] = [];
+  private gemHigh = 0;
+
+  // Level-up ring: one Graphics drawn once, expanded + faded over the flash.
+  private levelUpRing = new Graphics();
 
   // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
   // aim (pointing +x). Per active strike we set position/rotation/alpha — no
@@ -183,6 +192,20 @@ export class Renderer {
     this.axeContainer = axe.container;
     this.axeParticles = axe.particles;
 
+    // XP gems: small bright diamonds-as-circles, one shared texture, tinted cyan.
+    const gemTex: Texture = this.app.renderer.generateTexture(
+      new Graphics().circle(0, 0, XP.gemRadius).fill(0xffffff),
+    );
+    const gem = this.buildParticlePool(gemTex, 0x5cf2ff, XP.capacity);
+    this.gemContainer = gem.container;
+    this.gemParticles = gem.particles;
+
+    // Level-up ring (gold), drawn once at origin; placed/scaled/faded per frame.
+    this.levelUpRing
+      .circle(0, 0, 40)
+      .stroke({ width: 4, color: 0xffd86b, alpha: 0.9 });
+    this.levelUpRing.visible = false;
+
     // Pooled whip wedges. Each draws the same sector once (apex at origin,
     // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
     // place + rotate + fade one.
@@ -225,7 +248,8 @@ export class Renderer {
     }
 
     // Draw order: backdrop, garlic aura, swarm, whip arcs, projectiles, numbers,
-    // player on top. The aura sits under the swarm so enemies wade through it.
+    // then gems near the top so the swarm + damage-number text don't bury them,
+    // player, and the level-up ring on top. The aura sits under the swarm.
     this.world.addChild(
       frame,
       this.garlicAura,
@@ -234,7 +258,9 @@ export class Renderer {
       this.projContainer,
       this.axeContainer,
       this.dnLayer,
+      this.gemContainer,
       this.playerDot,
+      this.levelUpRing,
     );
     this.app.stage.addChild(this.world);
 
@@ -292,6 +318,33 @@ export class Renderer {
     }
     for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
     this.whipHigh = wn;
+
+    // XP gems: pooled particles, position-only.
+    const gm = state.gems;
+    const gp = this.gemParticles;
+    const gn = gm.count;
+    for (let i = 0; i < gn; i++) {
+      const p2 = gp[i]!;
+      p2.x = gm.posX[i]!;
+      p2.y = gm.posY[i]!;
+    }
+    for (let i = gn; i < this.gemHigh; i++) {
+      const p2 = gp[i]!;
+      p2.x = OFFSCREEN;
+      p2.y = OFFSCREEN;
+    }
+    this.gemHigh = gn;
+
+    // Level-up ring: expand outward and fade over the flash.
+    if (state.levelUpTimer > 0) {
+      const t = state.levelUpTimer / LEVEL.upFlashTime; // 1 → 0
+      this.levelUpRing.position.set(p.pos.x, p.pos.y);
+      this.levelUpRing.scale.set(1 + (1 - t) * 2.2);
+      this.levelUpRing.alpha = t;
+      this.levelUpRing.visible = true;
+    } else if (this.levelUpRing.visible) {
+      this.levelUpRing.visible = false;
+    }
 
     this.syncDamageNumbers(state.damageNumbers);
 

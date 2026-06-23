@@ -40,9 +40,37 @@
         pointer-events: none;
         user-select: none;
       }
+      #xpbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 7px;
+        z-index: 11;
+        background: rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+        user-select: none;
+      }
+      #xpfill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #49b6ff, #9b6bff);
+      }
+      #level {
+        position: fixed;
+        top: 12px;
+        right: 10px;
+        z-index: 11;
+        font-size: 14px;
+        font-weight: bold;
+        color: #bcd6ff;
+        text-shadow: 0 1px 2px #000;
+        pointer-events: none;
+        user-select: none;
+      }
       #hud {
         position: fixed;
-        top: 10px;
+        top: 14px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 10;
@@ -105,6 +133,8 @@
   <body>
     <div id="app"></div>
     <div id="perf"></div>
+    <div id="xpbar"><div id="xpfill"></div></div>
+    <div id="level">LV 1</div>
     <div id="hud">
       <div id="hpbar">
         <div id="hpfill"></div>
