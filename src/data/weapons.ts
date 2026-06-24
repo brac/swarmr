@@ -6,7 +6,7 @@ export const DAGGER = {
   damage: 14,
   projectileSpeed: 800, // px/sec
   projectileLifetime: 1.5, // seconds
-  projectileRadius: 6,
+  projectileRadius: 14, // chunky blades — drives both the hitbox and the sprite scale
   pierce: 1, // enemies one projectile passes through before despawning
   count: 1, // projectiles per fire (default; upgrades raise it)
   spread: 0.13, // fan angle between daggers when count > 1 (rad)
@@ -99,15 +99,20 @@ export const LASER = {
   duration: 0.3, // seconds the beam stays ON once triggered (the 300ms blast)
   damage: 26, // per re-hit tick — hits hard (base and Prism share this stat)
   range: 2500, // beam length (px) — overshoots the world diagonal so it always runs off-screen
-  width: 36, // beam thickness (px); half-width is the hit test's perpendicular limit
+  width: 18, // beam thickness (px); half-width is the hit test's perpendicular limit
   rehitCooldown: 0.1, // per-enemy seconds between beam ticks (→ ~3 hits over a blast)
   // Prism (evolution) — fires on the SAME cadence as the base beam. Every beam
   // pierces through and runs off screen; at its first impact it forks into new
   // beams, which pierce + fork again up to a depth cap. Chain-lightning that never
   // stops short. See docs/05.
   evo: {
-    forks: 2, // new beams spawned at the first impact point
+    // Three fork directions around the incoming heading, but the center one (which
+    // would run straight ahead, redundant with the piercing main beam) is dropped —
+    // so each reflection emits the two outer beams, splayed at ±splitSpread.
+    forks: 3,
     maxDepth: 3, // a beam at depth < maxDepth may fork (root is depth 0)
-    splitSpread: 0.5, // rad between forks, around the incoming heading
+    splitSpread: 0.5, // rad between an outer fork and the (dropped) center
+    duration: 1.0, // beam stays ON for 1000ms (longer than the base 300ms blast)
+    damageMult: 0.5, // ...but hits softer per tick to offset the longer uptime
   },
 } as const;

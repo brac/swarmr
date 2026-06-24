@@ -31,7 +31,8 @@ export function updateLaser(state: GameState, dt: number): void {
   // Lock the beam's heading to the player's facing at this instant. Same cadence
   // for base and Prism — the evolution changes the hit shape, not the rhythm.
   if (state.laserActive <= 0 && state.laserTimer <= 0) {
-    state.laserActive = LASER.duration;
+    // Prism stays ON longer (1000ms) than the base blast (300ms).
+    state.laserActive = w.evolved ? LASER.evo.duration : LASER.duration;
     state.laserTimer += w.cooldown / state.passives.fireRateMult;
     state.laserDirX = state.player.facingX;
     state.laserDirY = state.player.facingY;
@@ -45,7 +46,9 @@ export function updateLaser(state: GameState, dt: number): void {
 
   const now = state.time;
   // Global Damage passive folds into the per-tick damage, like the other weapons.
-  const damage = w.damage * state.passives.damageMult;
+  // Prism trades per-tick punch for its longer uptime.
+  const damage =
+    w.damage * state.passives.damageMult * (w.evolved ? LASER.evo.damageMult : 1);
 
   if (w.evolved) {
     // Prism — recast the splitting tree from the locked heading each active tick.
@@ -158,8 +161,9 @@ function castBeam(
     const nextExclude = firstIsBoss ? EXCLUDE_BOSS : firstIdx;
     const forks = LASER.evo.forks;
     for (let f = 0; f < forks; f++) {
-      const a = angle + (f - (forks - 1) / 2) * LASER.evo.splitSpread;
-      castBeam(state, hx, hy, Math.cos(a), Math.sin(a), depth + 1, range, damage, now, nextExclude);
+      const offset = (f - (forks - 1) / 2) * LASER.evo.splitSpread;
+      if (offset === 0) continue; // drop the straight-ahead fork (the main beam already pierces through)
+      castBeam(state, hx, hy, Math.cos(angle + offset), Math.sin(angle + offset), depth + 1, range, damage, now, nextExclude);
     }
   }
 }

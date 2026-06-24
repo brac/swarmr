@@ -425,7 +425,8 @@ export class Renderer {
     // weapon shows one full-length beam along the locked heading; Prism draws its
     // segment tree (each scaled in x to its own length).
     if (state.laserActive > 0) {
-      const f = state.laserActive / LASER.duration; // 1 → 0 over the blast
+      const dur = state.weapons.laser.evolved ? LASER.evo.duration : LASER.duration;
+      const f = state.laserActive / dur; // 1 → 0 over the blast
       const alpha = f < 0.3 ? f / 0.3 : 1; // hold, then fade the final 30%
       const beams = this.laserBeams;
       let shown = 0;
