@@ -12,10 +12,13 @@ export function updateSpawn(state: GameState): void {
   const e = state.enemies;
   const time = state.time;
 
-  // Current swarm cap: clamped linear interpolation from startCount → rampToCount
-  // over rampSeconds, then held. `| 0` floors to an integer count. Plain arithmetic
-  // (no Math.min/max calls, no allocation) keeps this hot path clean.
-  const tn = time >= RAMP.rampSeconds ? 1 : time / RAMP.rampSeconds; // 0..1 progress
+  // Current swarm cap: ease-IN ramp from startCount → rampToCount over rampSeconds,
+  // then held. We square the 0..1 progress (`tn*tn`) so the opening minutes stay
+  // gentle and the crowd only piles on in the back half — a plain linear ramp added
+  // the same count every second, which buried the player before they could dig in.
+  // `| 0` floors to an integer count; plain arithmetic keeps this hot path clean.
+  const tn0 = time >= RAMP.rampSeconds ? 1 : time / RAMP.rampSeconds; // 0..1 progress
+  const tn = tn0 * tn0; // quadratic ease-in
   const target =
     (RAMP.startCount + (RAMP.rampToCount - RAMP.startCount) * tn) | 0;
   if (e.count >= target) return;

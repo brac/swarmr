@@ -18,7 +18,7 @@ export const SPAWN = {
 //   startCount  at  t = 0
 //   rampToCount at  t >= rampSeconds   (held thereafter)
 export const RAMP = {
-  startCount: 150, // enemies the run opens with — small but immediately busy
+  startCount: 5, // enemies the run opens with — a gentle trickle that ramps up
   rampToCount: 2000, // the north-star entity count, reached at rampSeconds
   rampSeconds: 540, // 9:00 of ramp; the last minute (→ boss at 10:00) holds at 2000
 } as const;
