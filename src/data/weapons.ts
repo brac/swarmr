@@ -5,7 +5,7 @@ export const DAGGER = {
   cooldown: 0.5, // seconds between fires
   damage: 14,
   projectileSpeed: 800, // px/sec
-  projectileLifetime: 1.5, // seconds
+  projectileLifetime: 3, // seconds — long enough to fly all the way off-screen
   projectileRadius: 14, // chunky blades — drives both the hitbox and the sprite scale
   pierce: 1, // enemies one projectile passes through before despawning
   count: 1, // projectiles per fire (default; upgrades raise it)
@@ -49,11 +49,14 @@ export const AXE = {
   cooldown: 1.4, // seconds between throws
   damage: 26,
   radius: 14, // collision radius (px)
-  gravity: 900, // downward accel (px/s²) → the parabola
-  launchSpeedY: 720, // initial upward speed (px/s)
-  launchSpeedX: 200, // max |horizontal| launch speed (px/s), randomized per throw
+  // Side-scroller: axes arc FORWARD (rightward) across the lane on a flat
+  // trajectory — high x-speed, a small upward kick, and gentle gravity so the
+  // parabola stays shallow and the axe travels most of the screen width.
+  gravity: 280, // downward accel (px/s²) → a shallow arc
+  launchSpeedY: 180, // small upward kick (px/s) — keeps the arc flat
+  launchSpeedX: 720, // forward (rightward) speed (px/s) — carries it across the screen
   spinRate: 14, // visual tumble (rad/s)
-  lifetime: 3, // backstop despawn (s); normally it falls off the bottom first
+  lifetime: 3.5, // backstop despawn (s); normally it leaves the right edge first
   count: 1, // axes per throw
   // Cyclone (evolution) — gravity off; each throw fires `count` axes evenly
   // around a ring whose base angle advances every throw, so successive volleys

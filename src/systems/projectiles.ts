@@ -26,7 +26,8 @@ export function updateProjectiles(state: GameState, dt: number): void {
     if (!dead) {
       if (p.kind[i] === PROJ_AXE) {
         p.spin[i]! += AXE.spinRate * dt; // tumble
-        dead = y > WORLD_H + OFF_MARGIN; // only the bottom ends it
+        // Forward-arcing axes leave the right edge or fall off the bottom.
+        dead = x > WORLD_W + OFF_MARGIN || y > WORLD_H + OFF_MARGIN;
       } else {
         dead =
           x < -OFF_MARGIN ||

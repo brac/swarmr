@@ -26,7 +26,9 @@ export const RAMP = {
 
 export const DIFFICULTY = {
   // Enemy HP multiplier grows linearly with elapsed time: 1 + minutes × this.
-  hpRampPerMin: 0.5, // +50% enemy HP per minute survived
+  // At 0.6/min the swarm is ~6.4× tougher by 9:00, so a late-game mob soaks the
+  // combined hit of several heavily-upgraded weapons before it drops.
+  hpRampPerMin: 0.6, // +60% enemy HP per minute survived
 
   // Spawn-weight tiers by elapsed seconds. Each tier's `w` is the relative spawn
   // weight per ENEMY_TYPES index [grunt, runner, tank]; the spawner uses the

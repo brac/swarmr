@@ -12,14 +12,18 @@ export interface EnemyType {
   xp: number; // XP dropped on death
 }
 
-// Index = type id used by the spawner and stored per enemy.
+// Index = type id used by the spawner and stored per enemy. Base HP is set so NO
+// level-1 weapon one-shots a level-1 mob: the strongest base hit is the Axe/Laser
+// at 26 (×1.15 max variance ≈ 30), and the frailest mob (Runner) has 40 HP, so it
+// always takes ≥2 strikes. HP then scales up over the run (DIFFICULTY.hpRampPerMin)
+// until the same mob needs several heavily-upgraded weapons at once to drop.
 export const ENEMY_TYPES: EnemyType[] = [
   // 0 — Grunt: the baseline swarm body.
-  { radius: 12, speed: 90, hp: 30, contactDamage: 10, color: 0xff5566, xp: 1 },
+  { radius: 12, speed: 90, hp: 65, contactDamage: 10, color: 0xff5566, xp: 1 },
   // 1 — Runner: fast and fragile, gets in your face.
-  { radius: 10, speed: 168, hp: 18, contactDamage: 8, color: 0xffb347, xp: 1 },
+  { radius: 10, speed: 168, hp: 40, contactDamage: 8, color: 0xffb347, xp: 1 },
   // 2 — Tank: slow, big, heavy hitter, worth more XP.
-  { radius: 19, speed: 55, hp: 120, contactDamage: 20, color: 0xb060e0, xp: 3 },
+  { radius: 19, speed: 55, hp: 240, contactDamage: 20, color: 0xb060e0, xp: 3 },
 ];
 
 export const ENEMY = {
