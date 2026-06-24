@@ -15,4 +15,5 @@ export const BOSS = {
   // sets the fight to a dramatic ~30s. All four numbers are the boss-fight dials.
   rehitGap: 0.08, // min seconds between projectile hits on the boss
   garlicCooldown: 0.4, // min seconds between garlic ticks on the boss
+  laserCooldown: 0.1, // min seconds between laser-beam ticks on the boss
 } as const;

@@ -39,6 +39,7 @@ export interface Boss {
   hitTimer: number; // hit-flash, like the swarm
   projHitUntil: number; // sim-time gate between projectile hits
   garlicNextHit: number; // sim-time gate between garlic ticks
+  laserNextHit: number; // sim-time gate between laser-beam ticks
 }
 
 export interface Player {
@@ -53,6 +54,8 @@ export interface Player {
   xpToNext: number; // XP needed to go from `level` to the next
   pickupRadius: number; // gem collect distance (px)
   magnetRadius: number; // gem homing distance (px)
+  facingX: number; // unit heading from the last movement input (drives the laser aim)
+  facingY: number; // updated only while moving; holds its last value when idle
 }
 
 // Global passive multipliers — upgrades that buff *every* weapon at once rather
@@ -79,6 +82,10 @@ export interface GameState {
   daggerTimer: number; // seconds until the Dagger may fire again
   whipTimer: number; // seconds until the Whip may swing again
   axeTimer: number; // seconds until the Axe may throw again
+  laserTimer: number; // seconds until the Laser may fire again
+  laserActive: number; // seconds the beam stays ON this blast (0 = beam off)
+  laserDirX: number; // beam heading, locked from player facing at trigger time
+  laserDirY: number;
   whipStrikes: WhipStrikes; // lingering swing visuals
   gems: Gems; // XP drops
   weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
@@ -110,6 +117,8 @@ export function createGameState(seed: number): GameState {
       xpToNext: xpToNext(1),
       pickupRadius: XP.pickupRadius,
       magnetRadius: XP.magnetRadius,
+      facingX: 1, // default heading: facing right until the first move input
+      facingY: 0,
     },
     hash: new SpatialHash(HASH_CELL_SIZE, WORLD_W, WORLD_H, ENEMY.capacity),
     enemies: new Enemies(ENEMY.capacity),
@@ -118,6 +127,10 @@ export function createGameState(seed: number): GameState {
     daggerTimer: 0,
     whipTimer: 0,
     axeTimer: 0,
+    laserTimer: 0,
+    laserActive: 0,
+    laserDirX: 1,
+    laserDirY: 0,
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
     gems: new Gems(XP.capacity),
     weapons: createWeaponState(),
@@ -134,6 +147,7 @@ export function createGameState(seed: number): GameState {
       hitTimer: 0,
       projHitUntil: 0,
       garlicNextHit: 0,
+      laserNextHit: 0,
     },
     won: false,
     gameOver: false,

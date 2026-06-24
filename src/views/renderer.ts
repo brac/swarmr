@@ -20,7 +20,7 @@ import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
-import { DAGGER, WHIP, GARLIC, AXE } from "../data/weapons";
+import { DAGGER, WHIP, GARLIC, AXE, LASER } from "../data/weapons";
 import { XP, LEVEL } from "../data/xp";
 import { BOSS } from "../data/boss";
 import type { Enemies } from "../state/enemies";
@@ -106,6 +106,10 @@ export class Renderer {
   private whipLayer = new Container();
   private whipGraphics: Graphics[] = [];
   private whipHigh = 0;
+
+  // Laser beam: one Graphics drawn once pointing +x; per active blast we place it at
+  // the player, rotate to the locked heading, and fade it. Hidden when the beam is off.
+  private laserBeam = new Graphics();
 
   // Damage numbers: composed from pooled digit sprites. Digit glyphs are pre-
   // rendered once to textures (white + a red set for crits); each number lays out
@@ -236,6 +240,25 @@ export class Renderer {
       this.whipLayer.addChild(g);
     }
 
+    // Laser beam, drawn once at the canonical aim (origin at the player, pointing +x,
+    // length = range). Per active blast we just place + rotate + fade it — no geometry
+    // rebuild. Layered glow → hot core gives it body; a muzzle flare anchors it at the
+    // player; additive blend makes it read as light over the dark floor.
+    {
+      const half = LASER.width / 2;
+      this.laserBeam
+        .rect(0, -half * 1.8, LASER.range, half * 3.6)
+        .fill({ color: 0xff2a2a, alpha: 0.16 }) // soft outer glow
+        .rect(0, -half, LASER.range, half * 2)
+        .fill({ color: 0xff5a3c, alpha: 0.5 }) // mid body
+        .rect(0, -half * 0.5, LASER.range, half)
+        .fill({ color: 0xffe8b0, alpha: 0.95 }) // hot core
+        .circle(0, 0, half * 1.6)
+        .fill({ color: 0xffffff, alpha: 0.7 }); // muzzle flare
+      this.laserBeam.blendMode = "add";
+      this.laserBeam.visible = false;
+    }
+
     // Pre-render each digit 0-9 to a texture, once, in white and in crit-red.
     // Damage numbers are then composed from these — no per-number text layout.
     for (let d = 0; d < 10; d++) {
@@ -273,6 +296,7 @@ export class Renderer {
       this.whipLayer,
       this.projContainer,
       this.axeContainer,
+      this.laserBeam,
       this.dnLayer,
       this.gemContainer,
       this.playerSprite,
@@ -340,6 +364,18 @@ export class Renderer {
     }
     for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
     this.whipHigh = wn;
+
+    // Laser beam: while a blast is active, place it at the player, rotate to the
+    // locked heading, and fade out over the last of its duration. Hidden otherwise.
+    if (state.laserActive > 0) {
+      this.laserBeam.position.set(p.pos.x, p.pos.y);
+      this.laserBeam.rotation = Math.atan2(state.laserDirY, state.laserDirX);
+      const f = state.laserActive / LASER.duration; // 1 → 0 over the blast
+      this.laserBeam.alpha = f < 0.3 ? f / 0.3 : 1; // hold, then fade the final 30%
+      this.laserBeam.visible = true;
+    } else if (this.laserBeam.visible) {
+      this.laserBeam.visible = false;
+    }
 
     // XP gems: pooled particles, position-only.
     const gm = state.gems;

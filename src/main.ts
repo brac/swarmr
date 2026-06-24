@@ -22,6 +22,7 @@ import { updateDagger } from "./systems/weapons/dagger";
 import { updateWhip } from "./systems/weapons/whip";
 import { updateGarlic } from "./systems/weapons/garlic";
 import { updateAxe } from "./systems/weapons/axe";
+import { updateLaser } from "./systems/weapons/laser";
 import { updateProjectiles } from "./systems/projectiles";
 import { updateCollision } from "./systems/collision";
 import { updateGems } from "./systems/gems";
@@ -163,6 +164,7 @@ async function main(): Promise<void> {
       updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
       updateWhip(state, dt); // sweep an arc; area-overlap damage (before collision)
       updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)
+      updateLaser(state, dt); // sustained beam along player facing; line hitbox (before collision)
       updateAxe(state, dt); // lob gravity axes upward (pooled projectiles)
       updateProjectiles(state, dt); // travel + lifetime (gravity arcs the axes)
       updateCollision(state); // projectile↔enemy, damage, deaths, gem drops

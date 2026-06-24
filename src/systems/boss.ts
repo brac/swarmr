@@ -61,6 +61,7 @@ export function spawnBoss(state: GameState): void {
   b.hitTimer = 0;
   b.projHitUntil = 0;
   b.garlicNextHit = 0;
+  b.laserNextHit = 0;
 }
 
 /**

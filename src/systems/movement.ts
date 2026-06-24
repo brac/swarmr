@@ -18,6 +18,11 @@ export function updatePlayer(state: GameState, input: Input, dt: number): void {
   p.pos.x += ax * inv * step;
   p.pos.y += ay * inv * step;
 
+  // Record the heading as a unit vector — the Laser fires along it. Only updates
+  // while moving; when idle the player keeps facing the way they last moved.
+  p.facingX = ax * inv;
+  p.facingY = ay * inv;
+
   // Keep the player inside the world bounds.
   if (p.pos.x < p.radius) p.pos.x = p.radius;
   else if (p.pos.x > WORLD_W - p.radius) p.pos.x = WORLD_W - p.radius;

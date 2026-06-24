@@ -49,3 +49,19 @@ export const GARLIC = {
   damage: 5, // per hit
   rehitCooldown: 0.45, // seconds before the same enemy can be hit again
 } as const;
+
+// Laser — a Cyclops-style sustained beam. The new shape it forces: a line-segment
+// hitbox (a long thin rectangle), unlike the projectile pool, the whip's wedge, or
+// garlic's disc. On cooldown it switches ON for `duration` and fires in the player's
+// facing direction (locked at trigger time), piercing every enemy along the line.
+// Like garlic it's continuous, so it carries a per-enemy re-hit cooldown — the beam
+// re-ticks a body every `rehitCooldown`, not every 240Hz frame. Facing is the other
+// new concept it forces (the swarm's auto-aim weapons never needed a player heading).
+export const LASER = {
+  cooldown: 3.0, // seconds between beams (trigger-to-trigger)
+  duration: 0.3, // seconds the beam stays ON once triggered (the 300ms blast)
+  damage: 13, // per re-hit tick
+  range: 1300, // beam length (px) — reaches clear across the world
+  width: 36, // beam thickness (px); half-width is the hit test's perpendicular limit
+  rehitCooldown: 0.1, // per-enemy seconds between beam ticks (→ ~3 hits over a blast)
+} as const;

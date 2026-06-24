@@ -87,6 +87,22 @@ export const UPGRADES: Upgrade[] = [
     },
   },
   {
+    id: "laser_dmg",
+    name: "Optic Blast",
+    desc: "+6 laser damage",
+    apply: (s) => {
+      s.weapons.laser.damage += 6;
+    },
+  },
+  {
+    id: "laser_rate",
+    name: "Overcharge",
+    desc: "Laser recharges 15% faster",
+    apply: (s) => {
+      s.weapons.laser.cooldown *= 0.85;
+    },
+  },
+  {
     id: "move_speed",
     name: "Swift Boots",
     desc: "+12% move speed",

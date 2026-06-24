@@ -18,6 +18,7 @@ export class Enemies {
   readonly hitTimer: Float32Array; // seconds of hit-react (flash/wobble) remaining
   readonly garlicNextHit: Float32Array; // sim-time this enemy is next eligible for garlic
   readonly projHitUntil: Float32Array; // sim-time before which a projectile won't re-hit it
+  readonly laserNextHit: Float32Array; // sim-time this enemy is next eligible for a laser tick
 
   // Per-enemy stats, set from the type on spawn.
   readonly speed: Float32Array;
@@ -35,6 +36,7 @@ export class Enemies {
     this.hitTimer = new Float32Array(capacity);
     this.garlicNextHit = new Float32Array(capacity);
     this.projHitUntil = new Float32Array(capacity);
+    this.laserNextHit = new Float32Array(capacity);
     this.speed = new Float32Array(capacity);
     this.radius = new Float32Array(capacity);
     this.contactDamage = new Float32Array(capacity);
@@ -57,6 +59,7 @@ export class Enemies {
     this.hitTimer[i] = 0;
     this.garlicNextHit[i] = 0; // eligible immediately on spawn
     this.projHitUntil[i] = 0;
+    this.laserNextHit[i] = 0;
     this.speed[i] = t.speed;
     this.radius[i] = t.radius;
     this.contactDamage[i] = t.contactDamage;
@@ -79,6 +82,7 @@ export class Enemies {
     this.hitTimer[i] = this.hitTimer[last]!;
     this.garlicNextHit[i] = this.garlicNextHit[last]!;
     this.projHitUntil[i] = this.projHitUntil[last]!;
+    this.laserNextHit[i] = this.laserNextHit[last]!;
     this.speed[i] = this.speed[last]!;
     this.radius[i] = this.radius[last]!;
     this.contactDamage[i] = this.contactDamage[last]!;

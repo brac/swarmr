@@ -3,13 +3,14 @@
 // resets (by building a fresh copy). Weapons read upgradeable fields from here;
 // static fields (projectile speed, arc shape, gravity, …) stay on the consts.
 
-import { DAGGER, WHIP, GARLIC, AXE } from "../data/weapons";
+import { DAGGER, WHIP, GARLIC, AXE, LASER } from "../data/weapons";
 
 export interface WeaponState {
   dagger: { cooldown: number; damage: number; count: number };
   whip: { cooldown: number; damage: number };
   garlic: { radius: number; damage: number };
   axe: { cooldown: number; damage: number };
+  laser: { cooldown: number; damage: number };
 }
 
 export function createWeaponState(): WeaponState {
@@ -22,5 +23,6 @@ export function createWeaponState(): WeaponState {
     whip: { cooldown: WHIP.cooldown, damage: WHIP.damage },
     garlic: { radius: GARLIC.radius, damage: GARLIC.damage },
     axe: { cooldown: AXE.cooldown, damage: AXE.damage },
+    laser: { cooldown: LASER.cooldown, damage: LASER.damage },
   };
 }
