@@ -339,6 +339,49 @@
         text-align: center;
         line-height: 1.4;
       }
+      /* Evolution cards — the 5th-pick payoff. Gold-styled so they read as
+         special among the ordinary upgrade choices. See docs/05. */
+      .up-card--evo {
+        position: relative;
+        overflow: hidden;
+        border-color: #ffd86b;
+        background: linear-gradient(160deg, #2a230f, #161a24 70%);
+        box-shadow: 0 0 18px rgba(255, 216, 107, 0.35);
+        animation: evo-pulse 1.4s ease-in-out infinite;
+      }
+      .up-card--evo:hover {
+        border-color: #ffe9a0;
+        background: linear-gradient(160deg, #342b12, #1d2433 70%);
+      }
+      .up-card--evo .up-name {
+        color: #ffd86b;
+      }
+      .up-card--evo .up-num {
+        background: #ffd86b;
+        color: #2a230f;
+      }
+      .up-ribbon {
+        position: absolute;
+        top: 9px;
+        right: -28px;
+        transform: rotate(45deg);
+        background: #ffd86b;
+        color: #2a230f;
+        font-size: 10px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        padding: 2px 32px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      }
+      @keyframes evo-pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 14px rgba(255, 216, 107, 0.3);
+        }
+        50% {
+          box-shadow: 0 0 24px rgba(255, 216, 107, 0.55);
+        }
+      }
     </style>
   </head>
   <body>

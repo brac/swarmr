@@ -10,6 +10,7 @@ import { Enemies } from "./enemies";
 import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
 import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
 import { WhipStrikes, WHIP_STRIKE_CAPACITY } from "./whipStrikes";
+import { Tendrils, TENDRIL_CAPACITY } from "./tendrils";
 import { Gems } from "./gems";
 import type { WeaponState } from "./weapons";
 import { createWeaponState } from "./weapons";
@@ -40,6 +41,18 @@ export interface Boss {
   projHitUntil: number; // sim-time gate between projectile hits
   garlicNextHit: number; // sim-time gate between garlic ticks
   laserNextHit: number; // sim-time gate between laser-beam ticks
+}
+
+// Prism (evolved laser) draws as a tree of straight segments — root + forks. The
+// system rewrites these each active tick; the renderer reads them. Preallocated
+// (zero per-frame alloc); `count` is how many are live this tick.
+export const MAX_LASER_SEGMENTS = 32;
+export interface LaserSegments {
+  ox: Float32Array; // segment origin x
+  oy: Float32Array; // segment origin y
+  angle: Float32Array; // heading (rad)
+  len: Float32Array; // length (px) — origin to impact, or full range if it hit nothing
+  count: number;
 }
 
 export interface Player {
@@ -81,12 +94,16 @@ export interface GameState {
   damageNumbers: DamageNumbers;
   daggerTimer: number; // seconds until the Dagger may fire again
   whipTimer: number; // seconds until the Whip may swing again
+  whipBack: boolean; // Reaper evolution: flips each swing for the front/back rhythm
   axeTimer: number; // seconds until the Axe may throw again
+  axeSpiralAngle: number; // Cyclone evolution: ring base angle, advanced each throw
   laserTimer: number; // seconds until the Laser may fire again
   laserActive: number; // seconds the beam stays ON this blast (0 = beam off)
   laserDirX: number; // beam heading, locked from player facing at trigger time
   laserDirY: number;
+  laserSegments: LaserSegments; // Prism's segment tree for this tick (evolved laser)
   whipStrikes: WhipStrikes; // lingering swing visuals
+  tendrils: Tendrils; // Black Aura damage tendrils (evolved garlic)
   gems: Gems; // XP drops
   weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
   passives: Passives; // global multipliers spanning all weapons (upgrades modify these)
@@ -126,12 +143,22 @@ export function createGameState(seed: number): GameState {
     damageNumbers: new DamageNumbers(DAMAGE_NUMBER_CAPACITY),
     daggerTimer: 0,
     whipTimer: 0,
+    whipBack: false,
     axeTimer: 0,
+    axeSpiralAngle: 0,
     laserTimer: 0,
     laserActive: 0,
     laserDirX: 1,
     laserDirY: 0,
+    laserSegments: {
+      ox: new Float32Array(MAX_LASER_SEGMENTS),
+      oy: new Float32Array(MAX_LASER_SEGMENTS),
+      angle: new Float32Array(MAX_LASER_SEGMENTS),
+      len: new Float32Array(MAX_LASER_SEGMENTS),
+      count: 0,
+    },
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
+    tendrils: new Tendrils(TENDRIL_CAPACITY),
     gems: new Gems(XP.capacity),
     weapons: createWeaponState(),
     // Fresh object on each createGameState → restart resets every passive to 1.0.

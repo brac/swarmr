@@ -19,14 +19,19 @@ import { rollHit } from "../combat";
 import { damageBoss } from "../boss";
 
 export function updateGarlic(state: GameState): void {
+  const g = state.weapons.garlic;
+  const now = state.time;
+
+  // Black Aura tendrils fade out on sim-time; age them every tick (even when the
+  // aura touches nothing this frame).
+  if (g.evolved) ageTendrils(state, now);
+
   const e = state.enemies;
   if (e.count === 0) return;
 
-  const g = state.weapons.garlic;
   const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
-  const now = state.time;
 
   // Global AoE passive scales the aura. Derive the effective radius once so every
   // query below (bounds + distance test) and the renderer's aura visual agree —
@@ -35,6 +40,9 @@ export function updateGarlic(state: GameState): void {
   // Global Damage passive folds into garlic's per-hit damage.
   const damage = g.damage * state.passives.damageMult;
   const r2 = auraRadius * auraRadius;
+  // Black Aura re-ticks faster (radius/damage are already folded into the live
+  // stats on evolve; see upgrades.ts).
+  const rehit = g.evolved ? GARLIC.evo.rehitCooldown : GARLIC.rehitCooldown;
 
   const cxLo = h.clampCX(px - auraRadius);
   const cxHi = h.clampCX(px + auraRadius);
@@ -73,7 +81,9 @@ export function updateGarlic(state: GameState): void {
           roll.amount,
           roll.crit ? 1 : 0,
         );
-        nextHit[j] = now + GARLIC.rehitCooldown;
+        nextHit[j] = now + rehit;
+        // Flick a tendril from the player out to the struck enemy.
+        if (g.evolved) spawnTendril(state, px, py, posX[j]!, posY[j]!, now);
       }
     }
   }
@@ -87,6 +97,31 @@ export function updateGarlic(state: GameState): void {
     if (dx * dx + dy * dy <= reach * reach) {
       damageBoss(state, damage);
       b.garlicNextHit = now + BOSS.garlicCooldown;
+      if (g.evolved) spawnTendril(state, px, py, b.pos.x, b.pos.y, now);
     }
+  }
+}
+
+// Flick a tendril visual from the player (ox,oy) out to a struck target (tx,ty).
+function spawnTendril(
+  state: GameState,
+  ox: number,
+  oy: number,
+  tx: number,
+  ty: number,
+  now: number,
+): void {
+  const dx = tx - ox;
+  const dy = ty - oy;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  state.tendrils.spawn(ox, oy, Math.atan2(dy, dx), len, now);
+}
+
+// Retire tendrils whose lifetime has elapsed (sim-time keyed, no dt needed).
+function ageTendrils(state: GameState, now: number): void {
+  const t = state.tendrils;
+  const ttl = GARLIC.evo.tendrilTTL;
+  for (let i = t.count - 1; i >= 0; i--) {
+    if (now - t.born[i]! >= ttl) t.kill(i);
   }
 }

@@ -11,6 +11,7 @@ import { Renderer } from "./views/renderer";
 import { PerfOverlay } from "./views/perfOverlay";
 import { Hud } from "./views/hud";
 import { UpgradeMenu } from "./views/upgradeMenu";
+import { DevMenu } from "./views/devMenu";
 import { rollUpgrades } from "./systems/upgrades";
 import { levelUp, levelDown } from "./systems/gems";
 import { updateSpawn } from "./systems/spawn";
@@ -99,7 +100,13 @@ async function main(): Promise<void> {
   //   R  restart (when dead/won)    L  toggle god mode (no contact damage)
   //   K  toggle XP leveling         ]  +1 level (opens upgrade menu)
   //   [  -1 level                   B  spawn the boss now    M  mute
+  //   `  toggle dev menu (weapon stages)
   window.addEventListener("keydown", (e) => {
+    // Dev menu toggles regardless of run state (handy on the title screen too).
+    if (e.code === "Backquote" && !e.repeat) {
+      devMenu.toggle();
+      return;
+    }
     // Any key starts the run from the title screen.
     if (!started) {
       startGame();
@@ -146,8 +153,17 @@ async function main(): Promise<void> {
   // the render loop re-opens the menu next frame with a fresh roll.
   const upgradeMenu = new UpgradeMenu(upgradesEl, (u) => {
     u.apply(state);
+    // A weapon's stat pick advances its level toward the evolution unlock; the
+    // evolution pick itself flips `evolved` in apply() and ends the line.
+    if (u.weapon && u.kind === "stat") state.weapons[u.weapon].level++;
     state.levelUpsPending--;
   });
+
+  // Dev menu (backtick): set any weapon to base / +1 / max / evolved on the fly.
+  const devMenu = new DevMenu(
+    () => state,
+    { spawnBoss: () => spawnBoss(state), levelUp: () => levelUp(state) },
+  );
 
   const loop = new Loop({
     update: (dt) => {
@@ -181,7 +197,7 @@ async function main(): Promise<void> {
       audio.update(state, 1 / 60);
       // Open the upgrade menu for each queued level-up (sim is paused meanwhile).
       if (!state.gameOver && state.levelUpsPending > 0 && !upgradeMenu.isOpen()) {
-        upgradeMenu.show(rollUpgrades(state.rng, 3));
+        upgradeMenu.show(rollUpgrades(state, 3));
       }
     },
   });

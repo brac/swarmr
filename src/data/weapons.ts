@@ -3,13 +3,23 @@
 
 export const DAGGER = {
   cooldown: 0.5, // seconds between fires
-  damage: 10,
+  damage: 14,
   projectileSpeed: 800, // px/sec
   projectileLifetime: 1.5, // seconds
   projectileRadius: 6,
   pierce: 1, // enemies one projectile passes through before despawning
   count: 1, // projectiles per fire (default; upgrades raise it)
   spread: 0.13, // fan angle between daggers when count > 1 (rad)
+  // Thousand Fangs (evolution) — drops the auto-aim fan for THREE parallel daggers
+  // hosed out along the player's facing as a fat, fast-moving row, fired constantly
+  // and piercing nothing (each stops at its first hit). Damage stays live (w.damage,
+  // so the 4 stat picks carry over); lifetime/radius reuse the base consts. See docs/05.
+  evo: {
+    cooldown: 0.05, // near-constant fire
+    streams: 3, // parallel daggers forming the row
+    rowSpacing: 9, // perpendicular px between adjacent streams
+    speedMult: 1.6, // faster than the base dagger
+  },
 } as const;
 
 // Whip — a fixed-arc melee cleave, no projectile. On cooldown it sweeps a wedge
@@ -18,10 +28,17 @@ export const DAGGER = {
 // per-enemy re-hit bookkeeping (that lesson is Garlic's). See CLAUDE.md build order.
 export const WHIP = {
   cooldown: 1.1, // seconds between swings
-  damage: 14,
+  damage: 18,
   range: 230, // reach (px)
   arcHalfAngle: 0.7, // half-width of the wedge (rad) → ~80° full arc
   strikeTTL: 0.18, // how long the swing graphic lingers/fades (s)
+  // Reaper (evolution) — keeps the wedge, but alternates the swing front → back →
+  // front on a faster cadence (the nearest-enemy aim is flipped 180° every other
+  // swing) at extended reach. See docs/05.
+  evo: {
+    range: 300, // reach (px) — wider than the base 230
+    cooldown: 0.5, // faster swings drive the front/back rhythm
+  },
 } as const;
 
 // Axe — a projectile with gravity. Launched up from the player with a random
@@ -30,7 +47,7 @@ export const WHIP = {
 // projectile gravity (the pool was straight-line until now).
 export const AXE = {
   cooldown: 1.4, // seconds between throws
-  damage: 20,
+  damage: 26,
   radius: 14, // collision radius (px)
   gravity: 900, // downward accel (px/s²) → the parabola
   launchSpeedY: 720, // initial upward speed (px/s)
@@ -38,6 +55,16 @@ export const AXE = {
   spinRate: 14, // visual tumble (rad/s)
   lifetime: 3, // backstop despawn (s); normally it falls off the bottom first
   count: 1, // axes per throw
+  // Cyclone (evolution) — gravity off; each throw fires `count` axes evenly
+  // around a ring whose base angle advances every throw, so successive volleys
+  // trace an outward spiral. See docs/05.
+  evo: {
+    count: 8, // axes per ring — 8 directions out of the player
+    speed: 360, // outward px/s (replaces the parabolic launch)
+    turn: 0.55, // rad the ring's base angle advances each throw
+    cooldown: 0.5, // s between rings
+    radiusMult: 2, // axes are 100% bigger
+  },
 } as const;
 
 // Garlic — a persistent aura centered on the player, no cooldown to "fire". Any
@@ -46,8 +73,18 @@ export const AXE = {
 // That per-entity cooldown is the lesson here — reused by every zone/DoT effect.
 export const GARLIC = {
   radius: 120, // aura radius (px)
-  damage: 5, // per hit
+  damage: 7, // per hit
   rehitCooldown: 0.45, // seconds before the same enemy can be hit again
+  // Black Aura (evolution) — wider, far harder, and faster-ticking; the renderer
+  // recolors it dark. radius/damage fold into the live stats on pickup (so the
+  // existing aura scaling just works); only the faster cadence is read at runtime.
+  // See docs/05.
+  evo: {
+    radiusMult: 1.6, // applied to the live radius stat on evolve
+    damageMult: 3, // applied to the live damage stat on evolve
+    rehitCooldown: 0.28, // faster re-tick than the base 0.45
+    tendrilTTL: 0.18, // seconds a "reach out and zap" tendril lingers per hit
+  },
 } as const;
 
 // Laser — a Cyclops-style sustained beam. The new shape it forces: a line-segment
@@ -60,8 +97,17 @@ export const GARLIC = {
 export const LASER = {
   cooldown: 3.0, // seconds between beams (trigger-to-trigger)
   duration: 0.3, // seconds the beam stays ON once triggered (the 300ms blast)
-  damage: 13, // per re-hit tick
-  range: 1300, // beam length (px) — reaches clear across the world
+  damage: 26, // per re-hit tick — hits hard (base and Prism share this stat)
+  range: 2500, // beam length (px) — overshoots the world diagonal so it always runs off-screen
   width: 36, // beam thickness (px); half-width is the hit test's perpendicular limit
   rehitCooldown: 0.1, // per-enemy seconds between beam ticks (→ ~3 hits over a blast)
+  // Prism (evolution) — fires on the SAME cadence as the base beam, but where the
+  // beam strikes a mob it forks from that point into new beams, which can fork
+  // again up to a depth cap. A chain-lightning feel. See docs/05.
+  evo: {
+    forks: 2, // new beams spawned at each impact point
+    maxDepth: 3, // a beam at depth < maxDepth may split (root is depth 0)
+    splitSpread: 0.5, // rad between forks, around the incoming heading
+    forkRange: 700, // px reach of a fork segment (the root uses the full range)
+  },
 } as const;

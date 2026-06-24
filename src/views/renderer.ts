@@ -17,7 +17,7 @@ import {
   Text,
 } from "pixi.js";
 import type { GameState } from "../state/gameState";
-import { WORLD_W, WORLD_H } from "../state/gameState";
+import { WORLD_W, WORLD_H, MAX_LASER_SEGMENTS } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
 import { DAGGER, WHIP, GARLIC, AXE, LASER } from "../data/weapons";
@@ -29,10 +29,12 @@ import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
 import type { DamageNumbers } from "../state/damageNumbers";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
 import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
+import { TENDRIL_CAPACITY } from "../state/tendrils";
 
 // Where inactive pooled particles sit — well outside the 1920x1080 world so they
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
 const OFFSCREEN = -10000;
+const TENDRIL_BASE_LEN = 100; // unit length a tendril Graphics is drawn at; scaled per use
 
 // Crit damage numbers: bigger and red so they read instantly over the swarm.
 const DN_CRIT_COLOR = 0xff4040;
@@ -53,9 +55,9 @@ const T_BOSS = 121; // skull-wraith
 const T_DAGGER = 103;
 const T_AXE = 118;
 
-// A 16px sprite covers ~3.2× the entity radius (overhang beyond the hitbox reads
+// A 16px sprite covers ~4× the entity radius (overhang beyond the hitbox reads
 // better — characters look chunkier than their collision circle).
-const SPRITE_PER_RADIUS = 3.2 / TILE;
+const SPRITE_PER_RADIUS = 4 / TILE;
 // The dagger art points up; rotate it from that to its travel direction.
 const DAGGER_SPRITE_OFFSET = Math.PI / 2;
 const FLOOR_TILE_SCALE = 3; // 16px floor tile → 48px on the world grid
@@ -107,9 +109,16 @@ export class Renderer {
   private whipGraphics: Graphics[] = [];
   private whipHigh = 0;
 
-  // Laser beam: one Graphics drawn once pointing +x; per active blast we place it at
-  // the player, rotate to the locked heading, and fade it. Hidden when the beam is off.
-  private laserBeam = new Graphics();
+  // Black Aura tendrils (evolved garlic): pooled thin-line Graphics, drawn once at
+  // a unit length pointing +x; per active tendril we place/rotate/scale/fade one.
+  private tendrilLayer = new Container();
+  private tendrilGraphics: Graphics[] = [];
+  private tendrilHigh = 0;
+
+  // Laser beams: a pool of identical Graphics drawn once pointing +x. The base
+  // weapon uses one (rotated to the locked heading); the Prism evolution uses the
+  // whole fan. Per active blast we place/rotate/fade the live ones, hide the rest.
+  private laserBeams: Graphics[] = [];
 
   // Damage numbers: composed from pooled digit sprites. Digit glyphs are pre-
   // rendered once to textures (white + a red set for crits); each number lays out
@@ -194,12 +203,13 @@ export class Renderer {
     this.projContainer = proj.container;
     this.projParticles = proj.particles;
 
-    // Axe: sprite that tumbles (rotation dynamic).
+    // Axe: sprite that tumbles (rotation dynamic) and sizes to its own radius
+    // (vertex) so Cyclone's 2× axes render bigger than the base lob.
     const axe = this.buildParticlePool(
       this.tile(atlas, T_AXE),
       0xffffff,
       PROJECTILE_CAPACITY,
-      { position: true, rotation: true },
+      { position: true, rotation: true, vertex: true },
       AXE.radius * SPRITE_PER_RADIUS,
     );
     this.axeContainer = axe.container;
@@ -240,23 +250,40 @@ export class Renderer {
       this.whipLayer.addChild(g);
     }
 
+    // Black Aura tendrils: each a thin violet line of unit length (pointing +x);
+    // per active tendril we scale x to its reach and fade by age. Additive glow.
+    for (let i = 0; i < TENDRIL_CAPACITY; i++) {
+      const g = new Graphics();
+      g.rect(0, -1.5, TENDRIL_BASE_LEN, 3).fill({ color: 0xcf6bff, alpha: 0.9 });
+      g.blendMode = "add";
+      g.visible = false;
+      this.tendrilGraphics.push(g);
+      this.tendrilLayer.addChild(g);
+    }
+
     // Laser beam, drawn once at the canonical aim (origin at the player, pointing +x,
     // length = range). Per active blast we just place + rotate + fade it — no geometry
     // rebuild. Layered glow → hot core gives it body; a muzzle flare anchors it at the
     // player; additive blend makes it read as light over the dark floor.
     {
       const half = LASER.width / 2;
-      this.laserBeam
-        .rect(0, -half * 1.8, LASER.range, half * 3.6)
-        .fill({ color: 0xff2a2a, alpha: 0.16 }) // soft outer glow
-        .rect(0, -half, LASER.range, half * 2)
-        .fill({ color: 0xff5a3c, alpha: 0.5 }) // mid body
-        .rect(0, -half * 0.5, LASER.range, half)
-        .fill({ color: 0xffe8b0, alpha: 0.95 }) // hot core
-        .circle(0, 0, half * 1.6)
-        .fill({ color: 0xffffff, alpha: 0.7 }); // muzzle flare
-      this.laserBeam.blendMode = "add";
-      this.laserBeam.visible = false;
+      // One beam Graphics per possible Prism segment; the base weapon only ever
+      // shows the first (full length). Per segment we scale x to its length.
+      for (let i = 0; i < MAX_LASER_SEGMENTS; i++) {
+        const beam = new Graphics();
+        beam
+          .rect(0, -half * 1.8, LASER.range, half * 3.6)
+          .fill({ color: 0xff2a2a, alpha: 0.16 }) // soft outer glow
+          .rect(0, -half, LASER.range, half * 2)
+          .fill({ color: 0xff5a3c, alpha: 0.5 }) // mid body
+          .rect(0, -half * 0.5, LASER.range, half)
+          .fill({ color: 0xffe8b0, alpha: 0.95 }) // hot core
+          .circle(0, 0, half * 1.6)
+          .fill({ color: 0xffffff, alpha: 0.7 }); // muzzle flare
+        beam.blendMode = "add";
+        beam.visible = false;
+        this.laserBeams.push(beam);
+      }
     }
 
     // Pre-render each digit 0-9 to a texture, once, in white and in crit-red.
@@ -294,9 +321,10 @@ export class Renderer {
     this.world.addChild(
       this.bossSprite,
       this.whipLayer,
+      this.tendrilLayer,
       this.projContainer,
       this.axeContainer,
-      this.laserBeam,
+      ...this.laserBeams,
       this.dnLayer,
       this.gemContainer,
       this.playerSprite,
@@ -346,35 +374,80 @@ export class Renderer {
       (state.weapons.garlic.radius * state.passives.aoeMult) / GARLIC.radius,
     );
     this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
+    // Black Aura recolors the green disc to a dark violet.
+    this.garlicAura.tint = state.weapons.garlic.evolved ? 0xb84dff : 0xffffff;
 
     this.syncEnemies(state.enemies);
 
     this.syncProjectiles(state.projectiles);
 
-    // Whip strikes: place/rotate/fade each active wedge; hide the rest.
+    // Whip strikes: place/rotate/fade each active wedge; hide the rest. Reaper
+    // (evolved) keeps the wedge but scales it up to the extended reach.
     const ws = state.whipStrikes;
     const wg = this.whipGraphics;
     const wn = ws.count;
+    const whipScale = state.weapons.whip.evolved ? WHIP.evo.range / WHIP.range : 1;
     for (let i = 0; i < wn; i++) {
       const g = wg[i]!;
       g.position.set(ws.posX[i]!, ws.posY[i]!);
       g.rotation = ws.angle[i]!;
+      g.scale.set(whipScale);
       g.alpha = 1 - ws.age[i]! / WHIP.strikeTTL;
       g.visible = true;
     }
     for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
     this.whipHigh = wn;
 
-    // Laser beam: while a blast is active, place it at the player, rotate to the
-    // locked heading, and fade out over the last of its duration. Hidden otherwise.
+    // Black Aura tendrils: place/rotate each line at its player end, scale x to its
+    // reach, fade by sim-time age. Hidden when garlic isn't evolved (none spawn).
+    const td = state.tendrils;
+    const tg = this.tendrilGraphics;
+    const tn = td.count;
+    const tInvTTL = 1 / GARLIC.evo.tendrilTTL;
+    for (let i = 0; i < tn; i++) {
+      const g = tg[i]!;
+      g.position.set(td.ox[i]!, td.oy[i]!);
+      g.rotation = td.angle[i]!;
+      g.scale.set(td.len[i]! / TENDRIL_BASE_LEN, 1);
+      g.alpha = 1 - (state.time - td.born[i]!) * tInvTTL;
+      g.visible = true;
+    }
+    for (let i = tn; i < this.tendrilHigh; i++) tg[i]!.visible = false;
+    this.tendrilHigh = tn;
+
+    // Laser: while a blast is active, place/rotate/fade the live beam(s). The base
+    // weapon shows one full-length beam along the locked heading; Prism draws its
+    // segment tree (each scaled in x to its own length).
     if (state.laserActive > 0) {
-      this.laserBeam.position.set(p.pos.x, p.pos.y);
-      this.laserBeam.rotation = Math.atan2(state.laserDirY, state.laserDirX);
       const f = state.laserActive / LASER.duration; // 1 → 0 over the blast
-      this.laserBeam.alpha = f < 0.3 ? f / 0.3 : 1; // hold, then fade the final 30%
-      this.laserBeam.visible = true;
-    } else if (this.laserBeam.visible) {
-      this.laserBeam.visible = false;
+      const alpha = f < 0.3 ? f / 0.3 : 1; // hold, then fade the final 30%
+      const beams = this.laserBeams;
+      let shown = 0;
+      if (state.weapons.laser.evolved) {
+        const segs = state.laserSegments;
+        shown = segs.count;
+        for (let k = 0; k < shown; k++) {
+          const beam = beams[k]!;
+          beam.position.set(segs.ox[k]!, segs.oy[k]!);
+          beam.rotation = segs.angle[k]!;
+          beam.scale.set(segs.len[k]! / LASER.range, 1); // shorten to the segment
+          beam.alpha = alpha;
+          beam.visible = true;
+        }
+      } else {
+        const beam = beams[0]!;
+        beam.position.set(p.pos.x, p.pos.y);
+        beam.rotation = Math.atan2(state.laserDirY, state.laserDirX);
+        beam.scale.set(1, 1);
+        beam.alpha = alpha;
+        beam.visible = true;
+        shown = 1;
+      }
+      for (let k = shown; k < beams.length; k++) {
+        if (beams[k]!.visible) beams[k]!.visible = false;
+      }
+    } else {
+      for (const beam of this.laserBeams) if (beam.visible) beam.visible = false;
     }
 
     // XP gems: pooled particles, position-only.
@@ -538,6 +611,7 @@ export class Renderer {
     const velX = pr.velX;
     const velY = pr.velY;
     const spin = pr.spin;
+    const radius = pr.radius;
     const kind = pr.kind;
     const n = pr.count;
     let dN = 0;
@@ -548,6 +622,9 @@ export class Renderer {
         p.x = posX[i]!;
         p.y = posY[i]!;
         p.rotation = spin[i]!; // tumble
+        const s = radius[i]! * SPRITE_PER_RADIUS; // size to this axe's radius
+        p.scaleX = s;
+        p.scaleY = s;
       } else {
         const p = daggerP[dN++]!;
         p.x = posX[i]!;

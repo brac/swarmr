@@ -40,25 +40,30 @@ export function updateWhip(state: GameState, dt: number): void {
   // Global Damage passive folds into the swing's damage once, up front.
   const damage = wstat.damage * state.passives.damageMult;
 
+  const evolved = wstat.evolved;
   const e = state.enemies;
   // Aim unit vector toward the nearest enemy.
   const adx = e.posX[target]! - px;
   const ady = e.posY[target]! - py;
   const invLen = 1 / Math.sqrt(adx * adx + ady * ady || 1);
-  const ux = adx * invLen;
-  const uy = ady * invLen;
+  // Reaper flips the aim 180° on alternate swings → a front/back/front rhythm.
+  const flip = evolved && state.whipBack ? -1 : 1;
+  if (evolved) state.whipBack = !state.whipBack;
+  const ux = adx * invLen * flip;
+  const uy = ady * invLen * flip;
   const angle = Math.atan2(uy, ux);
 
   // Walk the cell block covering the wedge's bounding box; damage every enemy
   // within range AND within the arc. Arc test is a dot product vs cos(halfAngle)
-  // — no atan2 per enemy.
-  const range2 = WHIP.range * WHIP.range;
+  // — no atan2 per enemy. Reaper (evolved) keeps the wedge but reaches farther.
+  const range = evolved ? WHIP.evo.range : WHIP.range;
+  const range2 = range * range;
   const cosHalf = Math.cos(WHIP.arcHalfAngle);
   const h = state.hash;
-  const cxLo = h.clampCX(px - WHIP.range);
-  const cxHi = h.clampCX(px + WHIP.range);
-  const cyLo = h.clampCY(py - WHIP.range);
-  const cyHi = h.clampCY(py + WHIP.range);
+  const cxLo = h.clampCX(px - range);
+  const cxHi = h.clampCX(px + range);
+  const cyLo = h.clampCY(py - range);
+  const cyHi = h.clampCY(py + range);
 
   const posX = e.posX;
   const posY = e.posY;
@@ -104,7 +109,7 @@ export function updateWhip(state: GameState, dt: number): void {
     const bx = b.pos.x - px;
     const by = b.pos.y - py;
     const bd2 = bx * bx + by * by;
-    const reach = WHIP.range + BOSS.radius;
+    const reach = range + BOSS.radius;
     if (bd2 > 1e-6 && bd2 <= reach * reach) {
       const invd = 1 / Math.sqrt(bd2);
       if ((bx * ux + by * uy) * invd >= cosHalf) damageBoss(state, damage);
@@ -113,5 +118,7 @@ export function updateWhip(state: GameState, dt: number): void {
 
   ws.spawn(px, py, angle); // lingering visual; collision compacts the dead later
   // Global Fire Rate passive shortens the effective cooldown (faster = divide).
-  state.whipTimer += wstat.cooldown / state.passives.fireRateMult;
+  // Reaper swings on its own faster cadence to sell the front/back rhythm.
+  const cooldown = evolved ? WHIP.evo.cooldown : wstat.cooldown;
+  state.whipTimer += cooldown / state.passives.fireRateMult;
 }

@@ -40,7 +40,16 @@ export class UpgradeMenu {
     row.className = "up-row";
     choices.forEach((u, i) => {
       const card = document.createElement("button");
-      card.className = "up-card";
+      const isEvo = u.kind === "evolution";
+      card.className = isEvo ? "up-card up-card--evo" : "up-card";
+
+      // Evolution cards wear a corner ribbon so the payoff is unmistakable.
+      if (isEvo) {
+        const ribbon = document.createElement("div");
+        ribbon.className = "up-ribbon";
+        ribbon.textContent = "EVOLUTION";
+        card.appendChild(ribbon);
+      }
 
       const num = document.createElement("div");
       num.className = "up-num";
