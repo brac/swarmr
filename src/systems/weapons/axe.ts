@@ -1,3 +1,7 @@
+// REDESIGN (side-scroller): the Cyclone spiral / 8-way ring sprays mostly into
+// empty space (left/up/down) — rethink as forward-biased lobs or a downrange
+// pattern. See BACKLOG.md "Side-scroller weapon redesigns".
+//
 // Axe — weapon four. The new system it forces: a projectile with gravity. It
 // launches UP from the player with a random horizontal lean, arcs over, and falls
 // off the bottom of the screen, piercing and damaging everything it crosses.

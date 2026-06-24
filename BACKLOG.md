@@ -1,5 +1,19 @@
 # Swarmr Backlog
 
+## Side-scroller weapon redesigns (TODO)
+The game pivoted to a side-scroller: the player rides the left, the swarm streams
+in straight from the right, weapons fire rightward (facing locked). These three
+weapons were designed for the top-down swarm and need a redesign for that frame:
+
+- **Garlic** — a player-centered aura makes little sense when threats only come
+  from the right. Rethink as a forward cone / wall / trailing hazard.
+- **Axe** — the Cyclone spiral / 8-way ring sprays mostly into empty space (left,
+  up, down). Rethink as forward-biased lobs or a downrange pattern.
+- **Whip** — the front/back wedge wastes the "back" swing on nothing. Rethink for
+  a rightward-facing strike (or vertical coverage of the incoming lane).
+
+Dagger (forward stream) and Laser (forward piercing/forking beam) already fit.
+
 ## Progressivly increase mob count
 Don't start off at 2000 mobs. Ramp up to 2000 over 9 minutes. The last minute is cleanup and boss battle
 

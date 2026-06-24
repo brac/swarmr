@@ -35,6 +35,7 @@ import { TENDRIL_CAPACITY } from "../state/tendrils";
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
 const OFFSCREEN = -10000;
 const TENDRIL_BASE_LEN = 100; // unit length a tendril Graphics is drawn at; scaled per use
+const FLOOR_SCROLL_SPEED = 200; // px/sec the floor drifts left → reads as forward travel
 
 // Crit damage numbers: bigger and red so they read instantly over the swarm.
 const DN_CRIT_COLOR = 0xff4040;
@@ -67,6 +68,7 @@ export class Renderer {
   readonly app = new Application();
   /** Everything in world space lives under here; we scale/position it to fit. */
   private world = new Container();
+  private floor!: TilingSprite; // scrolls left to sell the side-scroller's forward travel
   private playerSprite = new Sprite();
   private garlicAura = new Graphics(); // persistent damage aura around the player
   private shownGod = false; // last-applied god-mode tint state (gate the tint write)
@@ -155,11 +157,11 @@ export class Renderer {
 
     // Tiled floor across the whole world. A standalone texture (not an atlas
     // frame) so TilingSprite can't bleed neighbouring tiles at the seams.
-    const floor = new TilingSprite({
+    const floor = (this.floor = new TilingSprite({
       texture: floorTex,
       width: WORLD_W,
       height: WORLD_H,
-    });
+    }));
     floor.tileScale.set(FLOOR_TILE_SCALE);
     floor.tint = FLOOR_TINT; // darken the bright tile into a moody dungeon floor
     // A thin border just frames the play field.
@@ -364,6 +366,10 @@ export class Renderer {
       this.playerSprite.tint = state.godMode ? 0xffd700 : 0xffffff;
       this.shownGod = state.godMode;
     }
+
+    // Scroll the floor left so the player reads as advancing rightward through the
+    // world (the side-scroller illusion). Keyed off sim-time → smooth and seek-safe.
+    this.floor.tilePosition.x = -state.time * FLOOR_SCROLL_SPEED;
 
     // Garlic aura follows the player; scales with the (upgradeable) radius and
     // pulses its alpha to read as "active". The AoE passive multiplies the radius

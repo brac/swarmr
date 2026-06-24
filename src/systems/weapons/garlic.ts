@@ -1,3 +1,7 @@
+// REDESIGN (side-scroller): a player-centered aura is a poor fit now that threats
+// only come from the right — rethink as a forward cone / wall / trailing hazard.
+// See BACKLOG.md "Side-scroller weapon redesigns".
+//
 // Garlic — weapon three. The lesson it forces: a damage cooldown *per entity*.
 // Unlike the Dagger/Whip (which fire on a global cooldown), garlic is an always-on
 // aura. Every enemy inside the radius takes damage, but each enemy carries its own

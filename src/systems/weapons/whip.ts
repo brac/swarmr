@@ -1,3 +1,7 @@
+// REDESIGN (side-scroller): the front/back wedge wastes the "back" swing on empty
+// space — rethink as a rightward strike or vertical coverage of the incoming lane.
+// See BACKLOG.md "Side-scroller weapon redesigns".
+//
 // Whip — weapon two. The lesson it forces: a non-projectile, area-overlap damage
 // source. No pooled mover, no travel time. On cooldown it picks the nearest enemy
 // as an aim direction, then damages every enemy inside a fixed wedge (range +

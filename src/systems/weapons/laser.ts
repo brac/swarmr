@@ -68,11 +68,11 @@ export function updateLaser(state: GameState, dt: number): void {
   applyBeam(state, state.laserDirX, state.laserDirY, damage, now);
 }
 
-// Cast one Prism segment from (ox,oy) along unit (ux,uy): find the nearest target
-// on the line, record the drawn segment (origin→impact), damage that target, then
-// fork from the impact point — recursing until the depth cap or the segment buffer
-// fills. `exclude` is the index of the target this beam was spawned off of (or
-// EXCLUDE_BOSS), so a fork doesn't immediately re-hit its own parent.
+// Cast one Prism beam from (ox,oy) along unit (ux,uy): the beam ALWAYS runs the
+// full range (off screen), piercing and damaging every enemy it crosses; it then
+// forks from its FIRST impact point, recursing until the depth cap or the segment
+// buffer fills. `exclude` is the index of the target this beam was spawned off of
+// (or EXCLUDE_BOSS), so a fork doesn't immediately re-hit its own parent.
 function castBeam(
   state: GameState,
   ox: number,
@@ -88,6 +88,10 @@ function castBeam(
   const segs = state.laserSegments;
   if (segs.count >= MAX_LASER_SEGMENTS) return; // buffer full — stop branching
   const halfW = LASER.width * 0.5;
+  const angle = Math.atan2(uy, ux);
+
+  // The beam is drawn at full length and pierces everything — it never stops at a hit.
+  pushSegment(segs, ox, oy, angle, range);
 
   const e = state.enemies;
   const n = e.count;
@@ -96,9 +100,10 @@ function castBeam(
   const hp = e.hp;
   const radius = e.radius;
 
-  // Nearest enemy whose body the segment crosses, within [eps, range].
-  let bestT = Infinity;
-  let bestIdx = -1;
+  // Pierce-all: damage every enemy the beam crosses (gated by re-hit cooldown) and
+  // remember the nearest one — that's where the beam forks.
+  let firstT = Infinity;
+  let firstIdx = -1;
   for (let i = 0; i < n; i++) {
     if (i === exclude || hp[i]! <= 0) continue;
     const rx = posX[i]! - ox;
@@ -109,72 +114,52 @@ function castBeam(
     const perp = rx * uy - ry * ux;
     const lim = halfW + er;
     if (perp > lim || perp < -lim) continue;
-    if (t < bestT) {
-      bestT = t;
-      bestIdx = i;
+    if (now >= e.laserNextHit[i]!) {
+      const roll = rollHit(state.rng, damage);
+      hp[i]! -= roll.amount;
+      e.hitTimer[i] = ENEMY.hitReactTime;
+      e.laserNextHit[i] = now + LASER.rehitCooldown;
+      state.damageNumbers.spawn(posX[i]!, posY[i]! - er, roll.amount, roll.crit ? 1 : 0);
+    }
+    if (t < firstT) {
+      firstT = t;
+      firstIdx = i;
     }
   }
 
-  // The boss is outside the hash; test it as another candidate target.
+  // The boss is outside the hash; pierce it too, and let it be a fork point.
   const b = state.boss;
-  let bossHit = false;
+  let firstIsBoss = false;
   if (b.active && exclude !== EXCLUDE_BOSS) {
     const rx = b.pos.x - ox;
     const ry = b.pos.y - oy;
     const t = rx * ux + ry * uy;
-    if (t > HIT_EPS && t <= range + BOSS.radius && t < bestT) {
+    if (t > HIT_EPS && t <= range + BOSS.radius) {
       const perp = rx * uy - ry * ux;
       const lim = halfW + BOSS.radius;
       if (perp <= lim && perp >= -lim) {
-        bestT = t;
-        bestIdx = -1;
-        bossHit = true;
+        if (now >= b.laserNextHit) {
+          damageBoss(state, damage);
+          b.laserNextHit = now + BOSS.laserCooldown;
+        }
+        if (t < firstT) {
+          firstT = t;
+          firstIsBoss = true;
+          firstIdx = -1;
+        }
       }
     }
   }
 
-  const angle = Math.atan2(uy, ux);
-
-  // Nothing hit → draw the full-length segment and stop (no split).
-  if (bestIdx === -1 && !bossHit) {
-    pushSegment(segs, ox, oy, angle, range);
-    return;
-  }
-
-  // Hit: the drawn segment ends at the impact point.
-  pushSegment(segs, ox, oy, angle, bestT);
-  const hx = ox + ux * bestT;
-  const hy = oy + uy * bestT;
-
-  let nextExclude: number;
-  if (bossHit) {
-    if (now >= b.laserNextHit) {
-      damageBoss(state, damage);
-      b.laserNextHit = now + BOSS.laserCooldown;
-    }
-    nextExclude = EXCLUDE_BOSS;
-  } else {
-    if (now >= e.laserNextHit[bestIdx]!) {
-      const roll = rollHit(state.rng, damage);
-      hp[bestIdx]! -= roll.amount;
-      e.hitTimer[bestIdx] = ENEMY.hitReactTime;
-      e.laserNextHit[bestIdx] = now + LASER.rehitCooldown;
-      state.damageNumbers.spawn(
-        posX[bestIdx]!,
-        posY[bestIdx]! - radius[bestIdx]!,
-        roll.amount,
-        roll.crit ? 1 : 0,
-      );
-    }
-    nextExclude = bestIdx;
-  }
-
-  // Fork from the impact point, spreading around the incoming heading.
-  if (depth < LASER.evo.maxDepth) {
+  // Fork from the first impact point (the beam itself already ran off screen).
+  if (firstT < Infinity && depth < LASER.evo.maxDepth) {
+    const hx = ox + ux * firstT;
+    const hy = oy + uy * firstT;
+    const nextExclude = firstIsBoss ? EXCLUDE_BOSS : firstIdx;
     const forks = LASER.evo.forks;
     for (let f = 0; f < forks; f++) {
       const a = angle + (f - (forks - 1) / 2) * LASER.evo.splitSpread;
-      castBeam(state, hx, hy, Math.cos(a), Math.sin(a), depth + 1, LASER.evo.forkRange, damage, now, nextExclude);
+      castBeam(state, hx, hy, Math.cos(a), Math.sin(a), depth + 1, range, damage, now, nextExclude);
     }
   }
 }

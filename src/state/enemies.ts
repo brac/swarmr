@@ -8,6 +8,12 @@
 
 import { ENEMY_TYPES } from "../data/enemies";
 
+// Per-enemy movement behaviors. More will be added (rush from a side, spawn-and-
+// close, etc.); for now the side-scroller spawns everything as STRAIGHT_LEFT, but
+// the HOMING path (the original seek) is kept for those future types.
+export const MOVE_STRAIGHT_LEFT = 0; // drift straight right-to-left at own speed
+export const MOVE_HOMING = 1; // seek the player (original swarm behavior)
+
 export class Enemies {
   readonly capacity: number;
   count = 0;
@@ -27,6 +33,7 @@ export class Enemies {
   readonly color: Uint32Array; // base tint (0xRRGGBB)
   readonly xpValue: Int32Array; // XP dropped on death
   readonly type: Uint8Array; // ENEMY_TYPES index
+  readonly move: Uint8Array; // MOVE_* behavior
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -43,13 +50,20 @@ export class Enemies {
     this.color = new Uint32Array(capacity);
     this.xpValue = new Int32Array(capacity);
     this.type = new Uint8Array(capacity);
+    this.move = new Uint8Array(capacity);
   }
 
   /**
    * Activate one enemy of `type`, with its base HP scaled by `hpScale` (the
    * difficulty ramp). Returns its index, or -1 if at capacity.
    */
-  spawn(x: number, y: number, type: number, hpScale: number): number {
+  spawn(
+    x: number,
+    y: number,
+    type: number,
+    hpScale: number,
+    move: number = MOVE_STRAIGHT_LEFT,
+  ): number {
     if (this.count >= this.capacity) return -1;
     const t = ENEMY_TYPES[type]!;
     const i = this.count++;
@@ -66,6 +80,7 @@ export class Enemies {
     this.color[i] = t.color;
     this.xpValue[i] = t.xp;
     this.type[i] = type;
+    this.move[i] = move;
     return i;
   }
 
@@ -89,5 +104,6 @@ export class Enemies {
     this.color[i] = this.color[last]!;
     this.xpValue[i] = this.xpValue[last]!;
     this.type[i] = this.type[last]!;
+    this.move[i] = this.move[last]!;
   }
 }

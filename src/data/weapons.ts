@@ -101,13 +101,13 @@ export const LASER = {
   range: 2500, // beam length (px) — overshoots the world diagonal so it always runs off-screen
   width: 36, // beam thickness (px); half-width is the hit test's perpendicular limit
   rehitCooldown: 0.1, // per-enemy seconds between beam ticks (→ ~3 hits over a blast)
-  // Prism (evolution) — fires on the SAME cadence as the base beam, but where the
-  // beam strikes a mob it forks from that point into new beams, which can fork
-  // again up to a depth cap. A chain-lightning feel. See docs/05.
+  // Prism (evolution) — fires on the SAME cadence as the base beam. Every beam
+  // pierces through and runs off screen; at its first impact it forks into new
+  // beams, which pierce + fork again up to a depth cap. Chain-lightning that never
+  // stops short. See docs/05.
   evo: {
-    forks: 2, // new beams spawned at each impact point
-    maxDepth: 3, // a beam at depth < maxDepth may split (root is depth 0)
+    forks: 2, // new beams spawned at the first impact point
+    maxDepth: 3, // a beam at depth < maxDepth may fork (root is depth 0)
     splitSpread: 0.5, // rad between forks, around the incoming heading
-    forkRange: 700, // px reach of a fork segment (the root uses the full range)
   },
 } as const;

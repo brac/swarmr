@@ -5,6 +5,12 @@ import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import type { Input } from "../core/input";
 import { ENEMY } from "../data/enemies";
+import { MOVE_HOMING } from "../state/enemies";
+
+// Enemies that stream past the player and off the left edge are despawned here
+// (they'd otherwise drift forever off-screen, eating the capacity). Generous
+// margin so nothing pops while still partly visible.
+const CULL_LEFT = -120;
 
 export function updatePlayer(state: GameState, input: Input, dt: number): void {
   const ax = input.axisX();
@@ -18,10 +24,9 @@ export function updatePlayer(state: GameState, input: Input, dt: number): void {
   p.pos.x += ax * inv * step;
   p.pos.y += ay * inv * step;
 
-  // Record the heading as a unit vector — the Laser fires along it. Only updates
-  // while moving; when idle the player keeps facing the way they last moved.
-  p.facingX = ax * inv;
-  p.facingY = ay * inv;
+  // Facing is locked to the right in side-scroller mode: the Laser and the evolved
+  // Dagger stream always fire downrange at the incoming swarm, regardless of dodge
+  // direction. (facing stays at its (1,0) init — see createGameState.)
 
   // Keep the player inside the world bounds.
   if (p.pos.x < p.radius) p.pos.x = p.radius;
@@ -30,16 +35,18 @@ export function updatePlayer(state: GameState, input: Input, dt: number): void {
   else if (p.pos.y > WORLD_H - p.radius) p.pos.y = WORLD_H - p.radius;
 }
 
-// Enemies seek the player and push apart from neighbors (separation). The
-// separation query rides the spatial hash — the reason the hash exists. It reads
-// last tick's hash (rebuilt after this system runs); one frame of staleness is
-// invisible for steering.
+// Enemies move (by their per-enemy MOVE_* behavior) and push apart from neighbors
+// (separation). The separation query rides the spatial hash — the reason the hash
+// exists. It reads last tick's hash (rebuilt after this system runs); one frame of
+// staleness is invisible for steering. Side-scroller default is straight right-to-
+// left; HOMING (the original seek) is kept for future movement types.
 export function updateEnemies(state: GameState, dt: number): void {
   const e = state.enemies;
   const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
   const speeds = e.speed;
+  const move = e.move;
   const sepR2 = ENEMY.sepRadius * ENEMY.sepRadius;
   const sepStrength = ENEMY.sepStrength;
   const n = e.count;
@@ -63,16 +70,25 @@ export function updateEnemies(state: GameState, dt: number): void {
     const ht = hitTimer[i]!;
     if (ht > 0) hitTimer[i] = ht > dt ? ht - dt : 0;
 
-    // Seek the player as a unit vector × this enemy's speed.
-    let vx = px - ex;
-    let vy = py - ey;
-    const d2 = vx * vx + vy * vy;
-    if (d2 > 1e-6) {
-      const inv = speeds[i]! / Math.sqrt(d2);
-      vx *= inv;
-      vy *= inv;
+    // Base velocity by movement type.
+    let vx: number;
+    let vy: number;
+    if (move[i] === MOVE_HOMING) {
+      // Seek the player as a unit vector × this enemy's speed.
+      vx = px - ex;
+      vy = py - ey;
+      const d2 = vx * vx + vy * vy;
+      if (d2 > 1e-6) {
+        const inv = speeds[i]! / Math.sqrt(d2);
+        vx *= inv;
+        vy *= inv;
+      } else {
+        vx = 0;
+        vy = 0;
+      }
     } else {
-      vx = 0;
+      // Straight right-to-left at this enemy's speed (side-scroller default).
+      vx = -speeds[i]!;
       vy = 0;
     }
 
@@ -111,5 +127,11 @@ export function updateEnemies(state: GameState, dt: number): void {
 
     posX[i] = ex + vx * dt;
     posY[i] = ey + vy * dt;
+  }
+
+  // Cull anything that has streamed off the left edge. Backward swap-remove so the
+  // element pulled into slot i was already visited this pass.
+  for (let i = e.count - 1; i >= 0; i--) {
+    if (posX[i]! < CULL_LEFT) e.kill(i);
   }
 }

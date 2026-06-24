@@ -110,6 +110,7 @@ export interface GameState {
   levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
+  spawnTargetOverride: number; // dev: -1 = use the ramp; ≥0 pins the live spawn cap
   boss: Boss; // the 10-minute finale (inactive until then)
   won: boolean; // boss defeated; the sim freezes on the victory screen
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
@@ -123,7 +124,9 @@ export function createGameState(seed: number): GameState {
     tick: 0,
     kills: 0,
     player: {
-      pos: { x: WORLD_W / 2, y: WORLD_H / 2 },
+      // Side-scroller: the player rides the left side; the swarm streams in from
+      // the right (see updateSpawn) and the floor scrolls to imply forward travel.
+      pos: { x: WORLD_W * 0.22, y: WORLD_H / 2 },
       speed: PLAYER.speed,
       radius: PLAYER.radius,
       hp: PLAYER.maxHp,
@@ -166,6 +169,7 @@ export function createGameState(seed: number): GameState {
     levelUpTimer: 0,
     levelUpsPending: 0,
     levelingEnabled: true,
+    spawnTargetOverride: -1,
     boss: {
       active: false,
       pos: { x: 0, y: 0 },

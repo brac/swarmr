@@ -7,6 +7,7 @@ import type { GameState } from "../state/gameState";
 import type { WeaponId } from "../state/weapons";
 import { createWeaponState } from "../state/weapons";
 import { UPGRADES, WEAPON_STAT_CAP } from "../systems/upgrades";
+import { RAMP } from "../data/waves";
 
 const WEAPONS: WeaponId[] = ["dagger", "whip", "garlic", "axe", "laser"];
 
@@ -155,6 +156,30 @@ export class DevMenu {
       this.root.appendChild(row);
     }
 
+    // Spawn-cap slider: pin the live swarm size (overrides the ramp), or Auto.
+    const spawn = document.createElement("div");
+    Object.assign(spawn.style, { display: "flex", flexDirection: "column", gap: "3px", marginTop: "4px" } as CSSStyleDeclaration);
+    const spawnLabel = document.createElement("div");
+    const over = s.spawnTargetOverride;
+    spawnLabel.textContent =
+      over >= 0 ? `spawn cap: ${over} (live: ${s.enemies.count})` : `spawn cap: auto (live: ${s.enemies.count})`;
+    spawnLabel.style.color = "#aab2c5";
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = String(RAMP.rampToCount);
+    slider.step = "50";
+    slider.value = String(over >= 0 ? over : s.enemies.count);
+    slider.tabIndex = -1;
+    slider.style.width = "100%";
+    slider.addEventListener("input", () => {
+      const v = Number(slider.value);
+      this.getState().spawnTargetOverride = v; // live state, survives restart
+      spawnLabel.textContent = `spawn cap: ${v} (live: ${this.getState().enemies.count})`;
+    });
+    spawn.append(spawnLabel, slider);
+    this.root.appendChild(spawn);
+
     // Global helpers.
     const sep = document.createElement("div");
     sep.style.borderTop = "1px solid #2a3142";
@@ -175,6 +200,7 @@ export class DevMenu {
         }),
       ),
       this.button("God", () => this.act(() => { s.godMode = !s.godMode; })),
+      this.button("Auto spawn", () => this.act(() => { s.spawnTargetOverride = -1; })),
       this.button("+Level", () => this.act(() => this.actions.levelUp())),
       this.button("Spawn boss", () => this.act(() => this.actions.spawnBoss())),
     );

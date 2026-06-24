@@ -5,7 +5,7 @@
 
 import type { GameState } from "../state/gameState";
 import { BOSS } from "../data/boss";
-import { WORLD_W } from "../state/gameState";
+import { WORLD_W, WORLD_H } from "../state/gameState";
 import { PLAYER } from "../data/player";
 import { ENEMY } from "../data/enemies";
 import { rollHit } from "./combat";
@@ -49,13 +49,14 @@ export function updateBoss(state: GameState, dt: number): void {
   }
 }
 
-/** Activate the boss at the top-center of the world. */
+/** Activate the boss just off the right edge; it then seeks the player (advancing
+ *  in from the right like the rest of the side-scroller's swarm). */
 export function spawnBoss(state: GameState): void {
   const b = state.boss;
   if (b.active || state.won) return;
   b.active = true;
-  b.pos.x = WORLD_W / 2;
-  b.pos.y = 80;
+  b.pos.x = WORLD_W + BOSS.radius;
+  b.pos.y = WORLD_H / 2;
   b.hp = BOSS.hp;
   b.maxHp = BOSS.hp;
   b.hitTimer = 0;
