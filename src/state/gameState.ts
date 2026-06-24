@@ -16,7 +16,7 @@ import type { WeaponState } from "./weapons";
 import { createWeaponState } from "./weapons";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
-import { XP, xpToNext } from "../data/xp";
+import { XP } from "../data/xp";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
 // renderer letterboxes them to the actual viewport.
@@ -65,9 +65,8 @@ export interface Player {
   hp: number;
   maxHp: number;
   invuln: number; // seconds of remaining i-frames after a hit (0 = vulnerable)
-  xp: number; // XP banked toward the next level
-  level: number;
-  xpToNext: number; // XP needed to go from `level` to the next
+  xp: number; // gems collected this run (each = one upgrade; drives the HUD bar + pickup SFX)
+  level: number; // upgrades taken (= gems collected); shown as "LV" in the HUD
   pickupRadius: number; // gem collect distance (px)
   magnetRadius: number; // gem homing distance (px)
   facingX: number; // unit heading from the last movement input (drives the laser aim)
@@ -114,6 +113,7 @@ export interface GameState {
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
   spawnTargetOverride: number; // dev: -1 = use the ramp; ≥0 pins the live spawn cap
+  gemsDropped: number; // gems released so far this run (quota toward XP.runTotal)
   boss: Boss; // the 10-minute finale (inactive until then)
   won: boolean; // boss defeated; the sim freezes on the victory screen
   gameOver: boolean; // player HP hit 0; the sim freezes until restart
@@ -137,7 +137,6 @@ export function createGameState(seed: number): GameState {
       invuln: 0,
       xp: 0,
       level: 1,
-      xpToNext: xpToNext(1),
       pickupRadius: XP.pickupRadius,
       magnetRadius: XP.magnetRadius,
       facingX: 1, // default heading: facing right until the first move input
@@ -171,9 +170,13 @@ export function createGameState(seed: number): GameState {
     // Fresh object on each createGameState → restart resets every passive to 1.0.
     passives: { damageMult: 1, fireRateMult: 1, aoeMult: 1 },
     levelUpTimer: 0,
-    levelUpsPending: 0,
+    // One free opening pick: weapons all start at level 0 (not firing), so the run
+    // begins by choosing a starting weapon to bring to level 1 (rollUpgrades
+    // guarantees a weapon option while no weapon is active).
+    levelUpsPending: 1,
     levelingEnabled: true,
     spawnTargetOverride: -1,
+    gemsDropped: 0,
     boss: {
       active: false,
       pos: { x: 0, y: 0 },

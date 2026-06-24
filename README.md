@@ -11,8 +11,8 @@ The genre is light on rendering and heavy on entity throughput, so swarmr is bui
 **[brac.github.io/swarmr](https://brac.github.io/swarmr/)** — runs in any modern browser, no install.
 
 1. **Move** with `WASD` or the arrow keys — you hold the left side as the world scrolls past; that's the only control, and every weapon auto-fires downrange to the right.
-2. **Collect** the cyan XP gems enemies drop (they magnet toward you).
-3. **Level up** → pick one of three upgrades to shape your build. A weapon's 5th pick **evolves** it into a powered-up form (gold card).
+2. **Grab the cyan gems** — sparse and valuable (≈50 over the whole run). They lie on the ground and the world scrolls past them, so move to intercept; ones in magnet range home to you.
+3. **Each gem banks one upgrade** → pick one of three to shape your build. A weapon's 5th pick **evolves** it into a powered-up form (gold card).
 4. **Survive to 10:00**, then defeat the boss (it advances from the right too) to win.
 
 Enemies stream in from the right and get tougher over time: fast **runners** phase in around 0:25, heavy **tanks** around 1:15, and every enemy gains HP as the clock climbs.

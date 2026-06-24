@@ -17,6 +17,8 @@ export type UpgradeKind = "stat" | "evolution";
 // A weapon may take this many stat upgrades before its evolution unlocks.
 export const WEAPON_STAT_CAP = 4;
 
+const WEAPON_IDS: WeaponId[] = ["dagger", "whip", "garlic", "axe", "laser"];
+
 export interface Upgrade {
   id: string;
   name: string;
@@ -147,17 +149,7 @@ export const UPGRADES: Upgrade[] = [
       s.player.speed *= 1.12;
     },
   },
-  {
-    id: "max_hp",
-    name: "Vitality",
-    desc: "+25 max HP, heal 25",
-    weapon: null,
-    kind: "stat",
-    apply: (s) => {
-      s.player.maxHp += 25;
-      s.player.hp = Math.min(s.player.maxHp, s.player.hp + 25);
-    },
-  },
+  // (Vitality / +max-HP removed — health is being reworked.)
   {
     id: "magnet",
     name: "Magnetism",
@@ -293,8 +285,14 @@ export function rollUpgrades(state: GameState, n: number): Upgrade[] {
     }
   }
 
+  // Bootstrap: weapons start at level 0 (not firing). Until at least one is active,
+  // EVERY choice is a weapon (no passives) so the player must turn a weapon on and
+  // the kill→gem→upgrade loop can actually start.
+  const anyActive = WEAPON_IDS.some((w) => state.weapons[w].level >= 1);
+
   // Fill remaining slots from distinct random stat upgrades.
-  const pool = UPGRADES.filter((u) => statEligible(state, u));
+  let pool = UPGRADES.filter((u) => statEligible(state, u));
+  if (!anyActive) pool = pool.filter((u) => u.weapon !== null);
   while (out.length < n && pool.length > 0) {
     const idx = state.rng.int(0, pool.length);
     out.push(pool[idx]!);

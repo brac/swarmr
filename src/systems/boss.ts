@@ -39,7 +39,7 @@ export function updateBoss(state: GameState, dt: number): void {
     const dy = b.pos.y - p.pos.y;
     const rr = p.radius + BOSS.radius;
     if (dx * dx + dy * dy <= rr * rr) {
-      p.hp -= BOSS.contactDamage;
+      p.hp -= 1; // one heart per hit, same as swarm contact
       p.invuln = PLAYER.invulnTime;
       if (p.hp <= 0) {
         p.hp = 0;

@@ -35,7 +35,7 @@ export function updateContact(state: GameState, dt: number): void {
     const dy = e.posY[ei]! - p.pos.y;
     const rr = p.radius + e.radius[ei]!;
     if (dx * dx + dy * dy <= rr * rr) {
-      p.hp -= e.contactDamage[ei]!;
+      p.hp -= 1; // one heart per hit, regardless of which enemy
       p.invuln = PLAYER.invulnTime;
       if (p.hp <= 0) {
         p.hp = 0;

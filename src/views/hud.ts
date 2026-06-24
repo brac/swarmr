@@ -4,6 +4,7 @@
 // reflows stay rare (XP/boss-HP change constantly) — keeps the per-frame path cheap.
 
 import type { GameState } from "../state/gameState";
+import { XP } from "../data/xp";
 
 const UPDATE_INTERVAL = 0.066; // ~15Hz
 
@@ -14,8 +15,7 @@ function mmss(totalSeconds: number): string {
 }
 
 export class Hud {
-  private hpFill: HTMLElement;
-  private hpText: HTMLElement;
+  private hpText: HTMLElement; // now holds the heart row (♥/♡)
   private xpFill: HTMLElement;
   private levelText: HTMLElement;
   private timerText: HTMLElement;
@@ -45,7 +45,6 @@ export class Hud {
     boss: { wrap: HTMLElement; fill: HTMLElement },
     end: { win: HTMLElement; winStats: HTMLElement; death: HTMLElement },
   ) {
-    this.hpFill = hp.fill;
     this.hpText = hp.text;
     this.xpFill = xp.fill;
     this.levelText = xp.level;
@@ -66,15 +65,16 @@ export class Hud {
     const p = state.player;
 
     if (p.hp !== this.lastHp) {
-      const pct = p.hp > 0 ? p.hp / p.maxHp : 0;
-      this.hpFill.style.width = pct * 100 + "%";
-      // Green when healthy, red when low — instant read of danger.
-      this.hpFill.style.background = pct > 0.3 ? "#2fbf5a" : "#d33a3a";
-      this.hpText.textContent = Math.ceil(p.hp) + " / " + p.maxHp;
+      // Health is a 5-heart tracker: filled ♥ per remaining heart, ♡ for lost.
+      const left = Math.max(0, Math.round(p.hp));
+      let hearts = "";
+      for (let i = 0; i < p.maxHp; i++) hearts += i < left ? "♥" : "♡";
+      this.hpText.textContent = hearts;
       this.lastHp = p.hp;
     }
 
-    const xpPct = p.xpToNext > 0 ? p.xp / p.xpToNext : 0;
+    // The bar now tracks gems banked toward the run total (p.xp = gems collected).
+    const xpPct = Math.min(1, p.xp / XP.runTotal);
     if (xpPct !== this.lastXpPct) {
       this.xpFill.style.width = xpPct * 100 + "%";
       this.lastXpPct = xpPct;

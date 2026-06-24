@@ -10,6 +10,8 @@ import type { GameState } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { COMBAT } from "../data/combat";
 import { BOSS } from "../data/boss";
+import { XP } from "../data/xp";
+import { RAMP } from "../data/waves";
 import { PIERCE_INFINITE } from "../state/projectiles";
 import { rollHit } from "./combat";
 import { damageBoss } from "./boss";
@@ -78,11 +80,20 @@ export function updateCollision(state: GameState): void {
     }
   }
 
-  // Now compact out the dead. Downward + swap-remove keeps it O(deaths). Every
-  // death (from any weapon — they all funnel HP through here) drops an XP gem.
+  // Now compact out the dead. Downward + swap-remove keeps it O(deaths). Gems are
+  // SPARSE: rather than one per kill, the run releases ~XP.runTotal total, paced
+  // evenly across the ramp. A death drops a gem only while we're under that
+  // time-based quota — so the player banks ~50 gems over the 9 minutes.
+  const gemQuota = Math.min(
+    XP.runTotal,
+    Math.floor(state.time / (RAMP.rampSeconds / XP.runTotal)),
+  );
   for (let i = e.count - 1; i >= 0; i--) {
     if (e.hp[i]! <= 0) {
-      state.gems.spawn(e.posX[i]!, e.posY[i]!, e.xpValue[i]!);
+      if (state.gemsDropped < gemQuota) {
+        state.gems.spawn(e.posX[i]!, e.posY[i]!, 1);
+        state.gemsDropped++;
+      }
       state.kills++;
       e.kill(i);
     }
