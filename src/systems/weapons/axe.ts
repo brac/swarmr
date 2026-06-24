@@ -17,6 +17,7 @@ import { PROJ_AXE, PIERCE_INFINITE } from "../../state/projectiles";
 
 export function updateAxe(state: GameState, dt: number): void {
   const w = state.weapons.axe;
+  if (w.level < 1) return; // not acquired — doesn't throw until upgraded to level 1
   state.axeTimer -= dt;
   if (state.axeTimer > 0) return;
 
@@ -54,12 +55,11 @@ export function updateAxe(state: GameState, dt: number): void {
   }
 
   for (let c = 0; c < AXE.count; c++) {
-    const vx = state.rng.range(-AXE.launchSpeedX, AXE.launchSpeedX);
     state.projectiles.spawn(
       px,
       py,
-      vx,
-      -AXE.launchSpeedY, // launch upward
+      AXE.launchSpeedX, // forward (rightward) — axes only arc downrange now
+      -AXE.launchSpeedY, // small upward kick for a shallow arc
       AXE.lifetime,
       AXE.radius,
       damage,

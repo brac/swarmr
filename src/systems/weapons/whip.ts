@@ -30,6 +30,7 @@ export function updateWhip(state: GameState, dt: number): void {
   }
 
   const wstat = state.weapons.whip;
+  if (wstat.level < 1) return; // not acquired (strikes still aged above for any lingering visual)
   state.whipTimer -= dt;
   if (state.whipTimer > 0) return;
 

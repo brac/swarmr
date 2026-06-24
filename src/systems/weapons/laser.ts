@@ -25,6 +25,12 @@ const HIT_EPS = 1e-3; // ignore targets effectively at the segment origin
 
 export function updateLaser(state: GameState, dt: number): void {
   const w = state.weapons.laser;
+  if (w.level < 1) {
+    // Not acquired — make sure no beam lingers if it was just toggled off.
+    state.laserActive = 0;
+    state.laserSegments.count = 0;
+    return;
+  }
   state.laserTimer -= dt;
 
   // Trigger a fresh blast when the cooldown elapses and one isn't already firing.

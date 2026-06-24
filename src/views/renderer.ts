@@ -375,6 +375,7 @@ export class Renderer {
     // pulses its alpha to read as "active". The AoE passive multiplies the radius
     // in gameplay (garlic.ts), so fold the same aoeMult in here to keep the disc
     // matched to the actual damage range — both read state, no per-frame alloc.
+    this.garlicAura.visible = state.weapons.garlic.level >= 1; // hidden until acquired
     this.garlicAura.position.set(p.pos.x, p.pos.y);
     this.garlicAura.scale.set(
       (state.weapons.garlic.radius * state.passives.aoeMult) / GARLIC.radius,

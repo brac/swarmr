@@ -26,10 +26,11 @@ export function updateGarlic(state: GameState): void {
   const g = state.weapons.garlic;
   const now = state.time;
 
-  // Black Aura tendrils fade out on sim-time; age them every tick (even when the
-  // aura touches nothing this frame).
-  if (g.evolved) ageTendrils(state, now);
+  // Black Aura tendrils fade out on sim-time; age any that exist every tick (even
+  // when the aura touches nothing, or the weapon was just toggled off).
+  if (state.tendrils.count > 0) ageTendrils(state, now);
 
+  if (g.level < 1) return; // not acquired — no aura damage
   const e = state.enemies;
   if (e.count === 0) return;
 

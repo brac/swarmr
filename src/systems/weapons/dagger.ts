@@ -12,6 +12,7 @@ import { nearestEnemy } from "../targeting";
 
 export function updateDagger(state: GameState, dt: number): void {
   const w = state.weapons.dagger;
+  if (w.level < 1) return; // not yet acquired — doesn't fire until upgraded to level 1
   state.daggerTimer -= dt;
   if (state.daggerTimer > 0) return;
 

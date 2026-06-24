@@ -138,16 +138,27 @@ export class DevMenu {
       const row = document.createElement("div");
       Object.assign(row.style, { display: "flex", flexDirection: "column", gap: "3px" } as CSSStyleDeclaration);
 
+      const firing = w.level >= 1;
       const label = document.createElement("div");
-      const stage = w.evolved ? "EVOLVED" : `Lv ${w.level}/${WEAPON_STAT_CAP}`;
+      const stage = !firing
+        ? "OFF"
+        : w.evolved
+          ? "EVOLVED"
+          : `Lv ${w.level}/${WEAPON_STAT_CAP}`;
       label.textContent = `${wid.padEnd(7)} ${stage}`;
-      label.style.color = w.evolved ? "#ffd86b" : "#aab2c5";
+      label.style.color = !firing ? "#6c7689" : w.evolved ? "#ffd86b" : "#9fe0a0";
       row.appendChild(label);
 
       const btns = document.createElement("div");
       Object.assign(btns.style, { display: "flex", gap: "4px" } as CSSStyleDeclaration);
       btns.append(
-        this.button("Base", () => this.act(() => this.resetWeapon(s, wid))),
+        // Toggle firing: OFF resets the weapon to level 0; ON brings it to level 1.
+        this.button(firing ? "Off" : "On", () =>
+          this.act(() => {
+            if (s.weapons[wid].level >= 1) this.resetWeapon(s, wid);
+            else s.weapons[wid].level = 1;
+          }),
+        ),
         this.button("+1", () => this.act(() => this.addStat(s, wid))),
         this.button("Max", () => this.act(() => this.maxWeapon(s, wid))),
         this.button("Evolve", () => this.act(() => this.evolveWeapon(s, wid))),
