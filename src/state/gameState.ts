@@ -98,7 +98,6 @@ export interface GameState {
   whipTimer: number; // seconds until the Whip may swing again
   whipBack: boolean; // Reaper evolution: flips each swing for the front/back rhythm
   axeTimer: number; // seconds until the Axe may throw again
-  axeSpiralAngle: number; // Cyclone evolution: ring base angle, advanced each throw
   laserTimer: number; // seconds until the Laser may fire again
   laserActive: number; // seconds the beam stays ON this blast (0 = beam off)
   laserDirX: number; // beam heading, locked from player facing at trigger time
@@ -150,7 +149,6 @@ export function createGameState(seed: number): GameState {
     whipTimer: 0,
     whipBack: false,
     axeTimer: 0,
-    axeSpiralAngle: 0,
     laserTimer: 0,
     laserActive: 0,
     laserDirX: 1,

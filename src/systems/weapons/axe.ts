@@ -29,13 +29,16 @@ export function updateAxe(state: GameState, dt: number): void {
   // Global Damage passive folds in at the source so every axe carries it.
   const damage = w.damage * state.passives.damageMult;
 
-  // Cyclone — no gravity; fling a ring of 8 big axes straight outward, with the
-  // ring's base angle advanced each throw so the volleys trace a spiral.
+  // Cyclone — no gravity; fling two big axes FORWARD (rightward) with a small fan
+  // + jitter. No rotating spawner, nothing thrown behind the player.
   if (w.evolved) {
     const n = AXE.evo.count;
     const radius = AXE.radius * AXE.evo.radiusMult; // 100% bigger
+    const evoDamage = damage * AXE.evo.damageMult; // hits hard enough to cleave
+    const base = Math.atan2(state.player.facingY, state.player.facingX); // forward
     for (let c = 0; c < n; c++) {
-      const a = state.axeSpiralAngle + (c / n) * Math.PI * 2;
+      const offset = (c - (n - 1) / 2) * AXE.evo.spread;
+      const a = base + offset + (state.rng.next() * 2 - 1) * AXE.evo.jitter;
       state.projectiles.spawn(
         px,
         py,
@@ -43,13 +46,12 @@ export function updateAxe(state: GameState, dt: number): void {
         Math.sin(a) * AXE.evo.speed,
         AXE.lifetime,
         radius,
-        damage,
+        evoDamage,
         PIERCE_INFINITE,
         0, // gravity off — these fly flat
         PROJ_AXE,
       );
     }
-    state.axeSpiralAngle += AXE.evo.turn;
     state.axeTimer += AXE.evo.cooldown / state.passives.fireRateMult;
     return;
   }

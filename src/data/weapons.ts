@@ -58,15 +58,18 @@ export const AXE = {
   spinRate: 14, // visual tumble (rad/s)
   lifetime: 3.5, // backstop despawn (s); normally it leaves the right edge first
   count: 1, // axes per throw
-  // Cyclone (evolution) — gravity off; each throw fires `count` axes evenly
-  // around a ring whose base angle advances every throw, so successive volleys
-  // trace an outward spiral. See docs/05.
+  // Cyclone (evolution) — gravity off; each throw flings TWO big, heavy-hitting
+  // axes FORWARD (rightward, like the base lob) with a little angle variation —
+  // no rotating spawner, nothing thrown behind. Infinite pierce + the damage
+  // multiplier lets them cleave straight through the swarm. See docs/05.
   evo: {
-    count: 8, // axes per ring — 8 directions out of the player
-    speed: 360, // outward px/s (replaces the parabolic launch)
-    turn: 0.55, // rad the ring's base angle advances each throw
-    cooldown: 0.5, // s between rings
-    radiusMult: 2, // axes are 100% bigger
+    count: 2, // axes per throw, fanned around the forward heading
+    speed: 600, // forward px/s (gravity off — straight lines)
+    cooldown: 0.5, // s between throws
+    radiusMult: 2, // axes are 100% bigger (unchanged)
+    damageMult: 4, // hits far harder than the base lob — cleaves through mobs
+    spread: 0.22, // rad — the fan between the two forward axes
+    jitter: 0.1, // rad — small random angle variation per throw
   },
 } as const;
 
