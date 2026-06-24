@@ -27,12 +27,19 @@ export function updateGarlic(state: GameState): void {
   const px = state.player.pos.x;
   const py = state.player.pos.y;
   const now = state.time;
-  const r2 = g.radius * g.radius;
 
-  const cxLo = h.clampCX(px - g.radius);
-  const cxHi = h.clampCX(px + g.radius);
-  const cyLo = h.clampCY(py - g.radius);
-  const cyHi = h.clampCY(py + g.radius);
+  // Global AoE passive scales the aura. Derive the effective radius once so every
+  // query below (bounds + distance test) and the renderer's aura visual agree —
+  // the renderer multiplies the same garlic radius by aoeMult on its scale line.
+  const auraRadius = g.radius * state.passives.aoeMult;
+  // Global Damage passive folds into garlic's per-hit damage.
+  const damage = g.damage * state.passives.damageMult;
+  const r2 = auraRadius * auraRadius;
+
+  const cxLo = h.clampCX(px - auraRadius);
+  const cxHi = h.clampCX(px + auraRadius);
+  const cyLo = h.clampCY(py - auraRadius);
+  const cyHi = h.clampCY(py + auraRadius);
 
   const posX = e.posX;
   const posY = e.posY;
@@ -57,7 +64,7 @@ export function updateGarlic(state: GameState): void {
         const dy = posY[j]! - py;
         if (dx * dx + dy * dy > r2) continue; // outside the aura
 
-        const roll = rollHit(state.rng, g.damage);
+        const roll = rollHit(state.rng, damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(
@@ -76,9 +83,9 @@ export function updateGarlic(state: GameState): void {
   if (b.active && now >= b.garlicNextHit) {
     const dx = b.pos.x - px;
     const dy = b.pos.y - py;
-    const reach = g.radius + BOSS.radius;
+    const reach = auraRadius + BOSS.radius; // scaled aura reaches the boss too
     if (dx * dx + dy * dy <= reach * reach) {
-      damageBoss(state, g.damage);
+      damageBoss(state, damage);
       b.garlicNextHit = now + BOSS.garlicCooldown;
     }
   }

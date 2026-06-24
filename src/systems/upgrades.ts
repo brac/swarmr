@@ -111,6 +111,32 @@ export const UPGRADES: Upgrade[] = [
       s.player.magnetRadius *= 1.3;
     },
   },
+  // Global passives — these buff every weapon at once (via state.passives), not a
+  // single weapon's stats. Weapons fold the multipliers in at the source.
+  {
+    id: "passive_dmg",
+    name: "Bloodlust",
+    desc: "+10% all weapon damage",
+    apply: (s) => {
+      s.passives.damageMult *= 1.1;
+    },
+  },
+  {
+    id: "passive_rate",
+    name: "Frenzy",
+    desc: "+5% all weapon fire rate",
+    apply: (s) => {
+      s.passives.fireRateMult *= 1.05;
+    },
+  },
+  {
+    id: "passive_aoe",
+    name: "Resonance",
+    desc: "+10% area of effect",
+    apply: (s) => {
+      s.passives.aoeMult *= 1.1;
+    },
+  },
 ];
 
 /** Pick `n` distinct random upgrades. */

@@ -28,6 +28,9 @@ export function updateDagger(state: GameState, dt: number): void {
   const dy = e.posY[target]! - py;
   const base = Math.atan2(dy, dx);
 
+  // Global Damage passive folds in at the source so every projectile carries it.
+  const damage = w.damage * state.passives.damageMult;
+
   // Fan multiple daggers symmetrically around the aim.
   for (let c = 0; c < w.count; c++) {
     const angle = base + (c - (w.count - 1) / 2) * DAGGER.spread;
@@ -38,12 +41,13 @@ export function updateDagger(state: GameState, dt: number): void {
       Math.sin(angle) * DAGGER.projectileSpeed,
       DAGGER.projectileLifetime,
       DAGGER.projectileRadius,
-      w.damage,
+      damage,
       DAGGER.pierce,
       0, // no gravity — straight-line
       PROJ_DAGGER,
     );
   }
 
-  state.daggerTimer += w.cooldown;
+  // Global Fire Rate passive shortens the effective cooldown (faster = divide).
+  state.daggerTimer += w.cooldown / state.passives.fireRateMult;
 }

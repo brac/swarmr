@@ -37,6 +37,9 @@ export function updateWhip(state: GameState, dt: number): void {
     return;
   }
 
+  // Global Damage passive folds into the swing's damage once, up front.
+  const damage = wstat.damage * state.passives.damageMult;
+
   const e = state.enemies;
   // Aim unit vector toward the nearest enemy.
   const adx = e.posX[target]! - px;
@@ -82,7 +85,7 @@ export function updateWhip(state: GameState, dt: number): void {
         const invd = 1 / Math.sqrt(d2);
         if ((dx * ux + dy * uy) * invd < cosHalf) continue;
 
-        const roll = rollHit(state.rng, wstat.damage);
+        const roll = rollHit(state.rng, damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
         state.damageNumbers.spawn(
@@ -104,10 +107,11 @@ export function updateWhip(state: GameState, dt: number): void {
     const reach = WHIP.range + BOSS.radius;
     if (bd2 > 1e-6 && bd2 <= reach * reach) {
       const invd = 1 / Math.sqrt(bd2);
-      if ((bx * ux + by * uy) * invd >= cosHalf) damageBoss(state, wstat.damage);
+      if ((bx * ux + by * uy) * invd >= cosHalf) damageBoss(state, damage);
     }
   }
 
   ws.spawn(px, py, angle); // lingering visual; collision compacts the dead later
-  state.whipTimer += wstat.cooldown;
+  // Global Fire Rate passive shortens the effective cooldown (faster = divide).
+  state.whipTimer += wstat.cooldown / state.passives.fireRateMult;
 }

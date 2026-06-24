@@ -3,8 +3,24 @@
 // so the difficulty has an arc.
 
 export const SPAWN = {
-  targetCount: 2000, // the north-star entity count
-  perTick: 4, // enemies spawned per logic tick until target (240Hz → ~2s ramp)
+  // The live spawn cap is NOT a constant — it ramps over the run (see RAMP below)
+  // so the opening isn't an instant wall of 2,000 enemies. `perTick` caps how fast
+  // we close the gap to whatever the *current* target is on any given tick.
+  perTick: 4, // enemies spawned per logic tick while below the current target
+} as const;
+
+// Progressive swarm ramp. The crowd grows from a small opening to the north-star
+// count over the first ~9 minutes, then holds flat for the final minute — which is
+// the boss phase (BOSS.spawnTime = 600s = 10:00). Dumping all 2,000 in the first ~2s
+// (the old behavior) was unfun; this gives the run a build.
+//
+// Current target at time t (seconds) is a clamped linear interpolation:
+//   startCount  at  t = 0
+//   rampToCount at  t >= rampSeconds   (held thereafter)
+export const RAMP = {
+  startCount: 150, // enemies the run opens with — small but immediately busy
+  rampToCount: 2000, // the north-star entity count, reached at rampSeconds
+  rampSeconds: 540, // 9:00 of ramp; the last minute (→ boss at 10:00) holds at 2000
 } as const;
 
 export const DIFFICULTY = {

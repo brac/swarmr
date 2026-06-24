@@ -314,9 +314,13 @@ export class Renderer {
     }
 
     // Garlic aura follows the player; scales with the (upgradeable) radius and
-    // pulses its alpha to read as "active".
+    // pulses its alpha to read as "active". The AoE passive multiplies the radius
+    // in gameplay (garlic.ts), so fold the same aoeMult in here to keep the disc
+    // matched to the actual damage range — both read state, no per-frame alloc.
     this.garlicAura.position.set(p.pos.x, p.pos.y);
-    this.garlicAura.scale.set(state.weapons.garlic.radius / GARLIC.radius);
+    this.garlicAura.scale.set(
+      (state.weapons.garlic.radius * state.passives.aoeMult) / GARLIC.radius,
+    );
     this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
 
     this.syncEnemies(state.enemies);

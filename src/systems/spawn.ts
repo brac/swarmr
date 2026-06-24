@@ -6,17 +6,24 @@
 import type { GameState } from "../state/gameState";
 import type { Rng } from "../core/rng";
 import { WORLD_W, WORLD_H } from "../state/gameState";
-import { SPAWN, DIFFICULTY } from "../data/waves";
+import { SPAWN, RAMP, DIFFICULTY } from "../data/waves";
 
 export function updateSpawn(state: GameState): void {
   const e = state.enemies;
-  if (e.count >= SPAWN.targetCount) return;
+  const time = state.time;
+
+  // Current swarm cap: clamped linear interpolation from startCount → rampToCount
+  // over rampSeconds, then held. `| 0` floors to an integer count. Plain arithmetic
+  // (no Math.min/max calls, no allocation) keeps this hot path clean.
+  const tn = time >= RAMP.rampSeconds ? 1 : time / RAMP.rampSeconds; // 0..1 progress
+  const target =
+    (RAMP.startCount + (RAMP.rampToCount - RAMP.startCount) * tn) | 0;
+  if (e.count >= target) return;
 
   const rng = state.rng;
-  const time = state.time;
   const hpScale = 1 + (time / 60) * DIFFICULTY.hpRampPerMin;
 
-  for (let n = 0; n < SPAWN.perTick && e.count < SPAWN.targetCount; n++) {
+  for (let n = 0; n < SPAWN.perTick && e.count < target; n++) {
     // Pick an edge, then a random point along it.
     const edge = rng.int(0, 4);
     let x: number;

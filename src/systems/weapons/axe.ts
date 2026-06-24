@@ -21,6 +21,9 @@ export function updateAxe(state: GameState, dt: number): void {
   const px = state.player.pos.x;
   const py = state.player.pos.y;
 
+  // Global Damage passive folds in at the source so every axe carries it.
+  const damage = w.damage * state.passives.damageMult;
+
   for (let c = 0; c < AXE.count; c++) {
     const vx = state.rng.range(-AXE.launchSpeedX, AXE.launchSpeedX);
     state.projectiles.spawn(
@@ -30,12 +33,13 @@ export function updateAxe(state: GameState, dt: number): void {
       -AXE.launchSpeedY, // launch upward
       AXE.lifetime,
       AXE.radius,
-      w.damage,
+      damage,
       PIERCE_INFINITE, // carve through every enemy until off-screen
       AXE.gravity,
       PROJ_AXE,
     );
   }
 
-  state.axeTimer += w.cooldown;
+  // Global Fire Rate passive shortens the effective cooldown (faster = divide).
+  state.axeTimer += w.cooldown / state.passives.fireRateMult;
 }

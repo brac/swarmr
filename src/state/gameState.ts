@@ -55,6 +55,17 @@ export interface Player {
   magnetRadius: number; // gem homing distance (px)
 }
 
+// Global passive multipliers — upgrades that buff *every* weapon at once rather
+// than one weapon's stats. Each starts at 1.0 (a no-op multiplier) and is grown
+// by its level-up upgrade. Weapons fold these in at the source so the effect is
+// uniform: damage at each spawn/hit, fire rate at each cooldown re-arm, AoE on the
+// area weapon(s). Stored as plain numbers — no per-frame allocation to read them.
+export interface Passives {
+  damageMult: number; // scales every weapon's damage (1.0 = unchanged)
+  fireRateMult: number; // scales firing speed; effective cooldown is divided by it
+  aoeMult: number; // scales area-of-effect size (currently the Garlic aura)
+}
+
 export interface GameState {
   rng: Rng;
   time: number; // accumulated sim seconds (the survival timer)
@@ -71,6 +82,7 @@ export interface GameState {
   whipStrikes: WhipStrikes; // lingering swing visuals
   gems: Gems; // XP drops
   weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
+  passives: Passives; // global multipliers spanning all weapons (upgrades modify these)
   levelUpTimer: number; // seconds remaining on the level-up flash (0 = idle)
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
@@ -109,6 +121,8 @@ export function createGameState(seed: number): GameState {
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
     gems: new Gems(XP.capacity),
     weapons: createWeaponState(),
+    // Fresh object on each createGameState → restart resets every passive to 1.0.
+    passives: { damageMult: 1, fireRateMult: 1, aoeMult: 1 },
     levelUpTimer: 0,
     levelUpsPending: 0,
     levelingEnabled: true,

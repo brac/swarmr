@@ -31,7 +31,9 @@ export const ENEMY = {
   hitFlashColor: 0xffffff, // peak flash tint; decays back to the enemy's color
   hitWobble: 0.4, // extra scale at the moment of impact (1 → 1.4)
   // Separation (boids-style): push apart from neighbors so the swarm spreads
-  // into a packed front instead of collapsing onto the player's exact point.
-  sepRadius: 22, // start repelling within this distance (≈ enemy diameter)
-  sepStrength: 130, // push speed contribution (px/sec) at max closeness
+  // into a WIDE packed front — a curved arc of bodies — instead of collapsing
+  // onto the player's exact point. Tuned to spread without overpowering the
+  // seek: seek still wins overall, so the front stays glued to the player.
+  sepRadius: 26, // start repelling within this distance (a touch past enemy diameter so the front loosens earlier; stays inside the hash's 3x3 search block so no neighbor is missed)
+  sepStrength: 165, // push speed contribution (px/sec) at max closeness — enough lateral shove to fan mobs into a wider arc, below the level that would push them off the player
 } as const;
