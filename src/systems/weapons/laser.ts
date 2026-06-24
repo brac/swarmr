@@ -61,6 +61,7 @@ export function updateLaser(state: GameState, dt: number): void {
       state.laserDirY,
       0,
       LASER.range,
+      1, // root width factor
       damage,
       now,
       -1,
@@ -71,11 +72,12 @@ export function updateLaser(state: GameState, dt: number): void {
   applyBeam(state, state.laserDirX, state.laserDirY, damage, now);
 }
 
-// Cast one Prism beam from (ox,oy) along unit (ux,uy): the beam ALWAYS runs the
-// full range (off screen), piercing and damaging every enemy it crosses; it then
-// forks from its FIRST impact point, recursing until the depth cap or the segment
-// buffer fills. `exclude` is the index of the target this beam was spawned off of
-// (or EXCLUDE_BOSS), so a fork doesn't immediately re-hit its own parent.
+// Cast one Prism beam from (ox,oy) along unit (ux,uy): find the nearest target,
+// STOP the drawn segment at it (Prism doesn't run off screen), damage it, then
+// reflect into two beams from that point — each shorter and thinner (the beam
+// "gets smaller"). Recurses until the reflection cap (5) or the segment buffer
+// fills. `exclude` is the target this beam reflected off of (or EXCLUDE_BOSS), so
+// a fork doesn't immediately re-hit its own parent.
 function castBeam(
   state: GameState,
   ox: number,
@@ -84,17 +86,15 @@ function castBeam(
   uy: number,
   depth: number,
   range: number,
+  widthF: number,
   damage: number,
   now: number,
   exclude: number,
 ): void {
   const segs = state.laserSegments;
   if (segs.count >= MAX_LASER_SEGMENTS) return; // buffer full — stop branching
-  const halfW = LASER.width * 0.5;
+  const halfW = LASER.width * 0.5 * widthF; // hit test narrows as the beam thins
   const angle = Math.atan2(uy, ux);
-
-  // The beam is drawn at full length and pierces everything — it never stops at a hit.
-  pushSegment(segs, ox, oy, angle, range);
 
   const e = state.enemies;
   const n = e.count;
@@ -103,10 +103,9 @@ function castBeam(
   const hp = e.hp;
   const radius = e.radius;
 
-  // Pierce-all: damage every enemy the beam crosses (gated by re-hit cooldown) and
-  // remember the nearest one — that's where the beam forks.
-  let firstT = Infinity;
-  let firstIdx = -1;
+  // Nearest enemy whose body the segment crosses within [eps, range].
+  let bestT = Infinity;
+  let bestIdx = -1;
   for (let i = 0; i < n; i++) {
     if (i === exclude || hp[i]! <= 0) continue;
     const rx = posX[i]! - ox;
@@ -117,53 +116,73 @@ function castBeam(
     const perp = rx * uy - ry * ux;
     const lim = halfW + er;
     if (perp > lim || perp < -lim) continue;
-    if (now >= e.laserNextHit[i]!) {
-      const roll = rollHit(state.rng, damage);
-      hp[i]! -= roll.amount;
-      e.hitTimer[i] = ENEMY.hitReactTime;
-      e.laserNextHit[i] = now + LASER.rehitCooldown;
-      state.damageNumbers.spawn(posX[i]!, posY[i]! - er, roll.amount, roll.crit ? 1 : 0);
-    }
-    if (t < firstT) {
-      firstT = t;
-      firstIdx = i;
+    if (t < bestT) {
+      bestT = t;
+      bestIdx = i;
     }
   }
 
-  // The boss is outside the hash; pierce it too, and let it be a fork point.
+  // The boss is outside the hash; test it as another candidate reflection point.
   const b = state.boss;
-  let firstIsBoss = false;
+  let bossHit = false;
   if (b.active && exclude !== EXCLUDE_BOSS) {
     const rx = b.pos.x - ox;
     const ry = b.pos.y - oy;
     const t = rx * ux + ry * uy;
-    if (t > HIT_EPS && t <= range + BOSS.radius) {
+    if (t > HIT_EPS && t <= range + BOSS.radius && t < bestT) {
       const perp = rx * uy - ry * ux;
       const lim = halfW + BOSS.radius;
       if (perp <= lim && perp >= -lim) {
-        if (now >= b.laserNextHit) {
-          damageBoss(state, damage);
-          b.laserNextHit = now + BOSS.laserCooldown;
-        }
-        if (t < firstT) {
-          firstT = t;
-          firstIsBoss = true;
-          firstIdx = -1;
-        }
+        bestT = t;
+        bestIdx = -1;
+        bossHit = true;
       }
     }
   }
 
-  // Fork from the first impact point (the beam itself already ran off screen).
-  if (firstT < Infinity && depth < LASER.evo.maxDepth) {
-    const hx = ox + ux * firstT;
-    const hy = oy + uy * firstT;
-    const nextExclude = firstIsBoss ? EXCLUDE_BOSS : firstIdx;
+  // Nothing hit → the beam reaches its max range and dies (no reflection).
+  if (bestIdx === -1 && !bossHit) {
+    pushSegment(segs, ox, oy, angle, range, widthF);
+    return;
+  }
+
+  // Hit: the drawn segment stops at the reflection point.
+  pushSegment(segs, ox, oy, angle, bestT, widthF);
+  const hx = ox + ux * bestT;
+  const hy = oy + uy * bestT;
+
+  let nextExclude: number;
+  if (bossHit) {
+    if (now >= b.laserNextHit) {
+      damageBoss(state, damage);
+      b.laserNextHit = now + BOSS.laserCooldown;
+    }
+    nextExclude = EXCLUDE_BOSS;
+  } else {
+    if (now >= e.laserNextHit[bestIdx]!) {
+      const roll = rollHit(state.rng, damage);
+      hp[bestIdx]! -= roll.amount;
+      e.hitTimer[bestIdx] = ENEMY.hitReactTime;
+      e.laserNextHit[bestIdx] = now + LASER.rehitCooldown;
+      state.damageNumbers.spawn(
+        posX[bestIdx]!,
+        posY[bestIdx]! - radius[bestIdx]!,
+        roll.amount,
+        roll.crit ? 1 : 0,
+      );
+    }
+    nextExclude = bestIdx;
+  }
+
+  // Reflect into two shorter, thinner beams from the impact point.
+  if (depth < LASER.evo.maxDepth) {
+    const childRange = range * LASER.evo.rangeShrink;
+    const childWidth = widthF * LASER.evo.widthShrink;
     const forks = LASER.evo.forks;
     for (let f = 0; f < forks; f++) {
       const offset = (f - (forks - 1) / 2) * LASER.evo.splitSpread;
-      if (offset === 0) continue; // drop the straight-ahead fork (the main beam already pierces through)
-      castBeam(state, hx, hy, Math.cos(angle + offset), Math.sin(angle + offset), depth + 1, range, damage, now, nextExclude);
+      if (offset === 0) continue; // drop the straight-ahead fork
+      castBeam(state, hx, hy, Math.cos(angle + offset), Math.sin(angle + offset), depth + 1, childRange, childWidth, damage, now, nextExclude);
     }
   }
 }
@@ -174,12 +193,14 @@ function pushSegment(
   oy: number,
   angle: number,
   len: number,
+  width: number,
 ): void {
   const i = segs.count;
   segs.ox[i] = ox;
   segs.oy[i] = oy;
   segs.angle[i] = angle;
   segs.len[i] = len;
+  segs.width[i] = width;
   segs.count = i + 1;
 }
 

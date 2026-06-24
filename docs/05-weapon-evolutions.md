@@ -68,7 +68,7 @@ Each is a branch inside the existing `update*()` system, keyed on
 | Axe    | Cyclone        | 8 axes flung outward on a rotating ring (spiral), gravity off, each 100% bigger | projectile pool + spiral angle on state; axe pool gains vertex scaling |
 | Garlic | Black Aura     | Larger radius, ~3× damage, faster re-tick; dark tint; flicks a tendril to each struck enemy per hit | garlic disc + `Tendrils` visual pool |
 | Whip   | Reaper         | Keeps the wedge but alternates the swing front → back → front on a faster cadence at extended reach | whip wedge (scaled up) |
-| Laser  | Prism          | Same cadence as the base beam, but forks from each impact point into new beams, chaining up to a depth cap (a tree of segments in `state.laserSegments`) | laser line-segment, pooled beam Graphics scaled per segment |
+| Laser  | Prism          | Same cadence as the base beam (on 1000ms, softer per tick). Unlike the base beam it does NOT run off screen: each beam stops at what it reflects off of, splits into two outer beams, and shrinks (shorter + thinner) each reflection — gone after 5 (a tree of segments in `state.laserSegments`) | laser line-segment, pooled beam Graphics scaled per segment |
 
 Names/numbers are placeholders — balance pass after the mechanic works.
 

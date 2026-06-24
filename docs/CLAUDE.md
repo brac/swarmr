@@ -1,6 +1,19 @@
 # swarmr — CLAUDE.md
 
-> Bullet-hell survivors game. Web. PixiJS v8. The genre is light on rendering and heavy on entity throughput — treat it as a systems problem, not a graphics problem.
+> **Side-scrolling bullet heaven** (auto-attack horde survival, played as a side-scroller). Web. PixiJS v8. The genre is light on rendering and heavy on entity throughput — treat it as a systems problem, not a graphics problem.
+
+## Current direction — side-scroller pivot
+
+swarmr began as a top-down arena survivor and has since pivoted to a **side-scrolling bullet heaven**: the player rides the left, the swarm streams in **straight from the right**, weapons fire **downrange (facing locked right)**, and the floor scrolls to imply forward travel. The systems backbone (pools, hash, fixed timestep) is unchanged — only the spawn geometry, enemy movement, and framing moved.
+
+What changed from the original top-down build:
+- **Spawn:** enemies enter only from the right edge; off-left-edge movers are culled.
+- **Movement:** per-enemy `MOVE_*` behavior — all spawn `STRAIGHT_LEFT`; the original `HOMING` seek is kept for future movement types.
+- **Weapons (5):** added **Laser** (sustained line-segment beam), and every weapon now **evolves** at its 5th upgrade pick (see `docs/05-weapon-evolutions.md`). **Garlic, Axe, and Whip are flagged for a side-scroller redesign** (they were designed for a top-down swarm — see `BACKLOG.md`).
+- **Swarm cap:** north-star count raised 2,000 → **2,500**.
+- **Dev menu** (backtick): set any weapon to base/+1/max/evolved and a live spawn-count slider.
+
+The sections below are the original (top-down) design intent and build history; treat the pivot notes above and the inline "as-built" notes as current.
 
 ## North star
 
@@ -12,7 +25,7 @@ swarmr is a complete, winnable, deployed game: **https://brac.github.io/swarmr/*
 
 The north star held — 2,000 enemies at frame budget with a flat heap throughout (logic ~1–2ms, render <1ms). Built well past the original slice:
 
-- **Weapons (4):** Dagger, Whip, Garlic, **Axe**. The Axe (a gravity projectile lobbed up that arcs back through the swarm with infinite pierce) replaced the planned **Holy Water** as weapon 4 — same "each weapon forces a new system" rationale, swapped by the designer mid-build. Holy Water (lobbed delayed-AOE) is the one planned weapon not built; clean future addition.
+- **Weapons (5):** Dagger, Whip, Garlic, **Axe**, **Laser**. The Axe (a gravity projectile lobbed up that arcs back through the swarm with infinite pierce) replaced the planned **Holy Water** as weapon 4 — same "each weapon forces a new system" rationale, swapped by the designer mid-build. The **Laser** (weapon 5) forced a line-segment hitbox. Each weapon **evolves** at its 5th upgrade pick (`docs/05`). Holy Water (lobbed delayed-AOE) is the one planned weapon not built; clean future addition.
 - **Stakes:** player HP, i-frame contact damage, death + restart.
 - **Progression:** XP gems → leveling → a pause-and-choose upgrade menu (12 upgrades that mutate per-run `state.weapons` / `state.player`).
 - **Variety + ramp:** 3 enemy types (grunt / runner / tank) phased in over time; enemy HP scales with elapsed time.
@@ -88,14 +101,14 @@ swarmr/
       pool.ts          # generic pool (entities use SoA pools instead)
     state/             # the world: gameState + SoA pools
       gameState.ts  enemies.ts  projectiles.ts  gems.ts  damageNumbers.ts
-      whipStrikes.ts  weapons.ts (mutable per-run stats)
+      whipStrikes.ts  tendrils.ts  weapons.ts (mutable per-run stats)
     systems/           # pure update logic
       movement.ts  spawn.ts  broadphase.ts  contactDamage.ts  collision.ts
       combat.ts (rollHit)  targeting.ts  gems.ts  upgrades.ts  boss.ts
       damageNumbers.ts  projectiles.ts
-      weapons/         dagger.ts  whip.ts  garlic.ts  axe.ts
+      weapons/         dagger.ts  whip.ts  garlic.ts  axe.ts  laser.ts
     views/             # dumb — read GameState, draw
-      renderer.ts (Pixi)  hud.ts (DOM)  upgradeMenu.ts  perfOverlay.ts
+      renderer.ts (Pixi)  hud.ts (DOM)  upgradeMenu.ts  devMenu.ts  perfOverlay.ts
     data/              # ALL tunables
       weapons.ts  enemies.ts  waves.ts  xp.ts  boss.ts  player.ts  combat.ts
     vite-env.d.ts

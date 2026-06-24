@@ -2,20 +2,20 @@
 
 ### ▶ [Play it now](https://brac.github.io/swarmr/)
 
-A browser-based **bullet-heaven survivor** — dodge a swarm of 2,000+ enemies, auto-fire four weapons, level up, build your character, and survive ten minutes to face the boss. Built with PixiJS v8 and TypeScript; no game engine.
+A browser-based **side-scrolling bullet heaven** — ride the left flank while a swarm of up to 2,500 enemies streams in from the right, auto-fire five weapons, level up (each weapon evolves at max), and survive ten minutes to face the boss. Built with PixiJS v8 and TypeScript; no game engine.
 
-The genre is light on rendering and heavy on entity throughput, so swarmr is built as a **systems problem, not a graphics problem**: a fixed-timestep simulation over structure-of-arrays entity pools, a uniform-grid spatial hash, and zero per-frame allocation in the hot path. It holds **2,000 enemies at frame budget** (≈2 ms logic / <1 ms render) with a flat heap.
+The genre is light on rendering and heavy on entity throughput, so swarmr is built as a **systems problem, not a graphics problem**: a fixed-timestep simulation over structure-of-arrays entity pools, a uniform-grid spatial hash, and zero per-frame allocation in the hot path. It holds **2,000+ enemies at frame budget** (≈2 ms logic / <1 ms render) with a flat heap.
 
 ## Play
 
 **[brac.github.io/swarmr](https://brac.github.io/swarmr/)** — runs in any modern browser, no install.
 
-1. **Move** with `WASD` or the arrow keys. That's the only control — every weapon auto-fires.
+1. **Move** with `WASD` or the arrow keys — you hold the left side as the world scrolls past; that's the only control, and every weapon auto-fires downrange to the right.
 2. **Collect** the cyan XP gems enemies drop (they magnet toward you).
-3. **Level up** → pick one of three upgrades to shape your build.
-4. **Survive to 10:00**, then defeat the boss to win.
+3. **Level up** → pick one of three upgrades to shape your build. A weapon's 5th pick **evolves** it into a powered-up form (gold card).
+4. **Survive to 10:00**, then defeat the boss (it advances from the right too) to win.
 
-Enemies get tougher over time: fast **runners** phase in around 0:25, heavy **tanks** around 1:15, and every enemy gains HP as the clock climbs.
+Enemies stream in from the right and get tougher over time: fast **runners** phase in around 0:25, heavy **tanks** around 1:15, and every enemy gains HP as the clock climbs.
 
 ### Controls
 
@@ -31,6 +31,7 @@ Enemies get tougher over time: fast **runners** phase in around 0:25, heavy **ta
 
 | Key | Action |
 |-----|--------|
+| `` ` `` | Open the dev menu (set any weapon to base/+1/max/evolved, spawn-count slider) |
 | `L` | Toggle god mode (ignore contact damage) |
 | `K` | Toggle XP leveling (freeze the upgrade flow) |
 | `]` / `[` | Manual level up (opens the menu) / level down |
@@ -44,6 +45,9 @@ Each weapon was added because it forces a *new system* to exist:
 - **Whip** — a fixed-arc melee cleave. Non-projectile, area-overlap damage.
 - **Garlic** — a persistent aura. Per-enemy re-hit cooldown (the DoT cadence pattern).
 - **Axe** — a gravity projectile lobbed upward that arcs down through the swarm with infinite pierce.
+- **Laser** — a sustained beam fired downrange along your (locked-right) facing. A line-segment hitbox that pierces everything in the lane.
+
+At its 5th upgrade each weapon **evolves**: the Dagger becomes a fast triple-stream, the Whip a front/back cleave, Garlic a searing tendril-flicking aura, the Axe an outward spiral of giant blades, and the Laser a reflecting beam that splits and shrinks across the swarm.
 
 Hits roll ±15% damage variance and a 15% / 2× crit (crits render larger and red).
 
@@ -108,7 +112,7 @@ src/
     audio.ts         # Howler observer (plays on state edges)
   state/             # the world: gameState + SoA entity pools (enemies, projectiles, gems, …)
   systems/           # pure update logic: movement, spawn, collision, weapons/, gems, boss, upgrades
-  views/             # renderer (Pixi), hud (DOM), upgradeMenu, perfOverlay
+  views/             # renderer (Pixi), hud (DOM), upgradeMenu, devMenu, perfOverlay
   data/              # all tunables (weapons, enemies, waves, xp, boss, player, combat)
 scripts/
   gen-sounds.mjs     # synthesizes public/sounds/*.wav

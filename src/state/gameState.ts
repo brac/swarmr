@@ -43,15 +43,18 @@ export interface Boss {
   laserNextHit: number; // sim-time gate between laser-beam ticks
 }
 
-// Prism (evolved laser) draws as a tree of straight segments — root + forks. The
-// system rewrites these each active tick; the renderer reads them. Preallocated
+// Prism (evolved laser) draws as a tree of straight segments — root + reflections.
+// Each beam stops at what it reflects off of, splits into two, and shrinks; gone
+// after 5 reflections. Worst case 1+2+4+8+16+32 = 63 segments, so the cap is 64.
+// The system rewrites these each active tick; the renderer reads them. Preallocated
 // (zero per-frame alloc); `count` is how many are live this tick.
-export const MAX_LASER_SEGMENTS = 32;
+export const MAX_LASER_SEGMENTS = 64;
 export interface LaserSegments {
   ox: Float32Array; // segment origin x
   oy: Float32Array; // segment origin y
   angle: Float32Array; // heading (rad)
-  len: Float32Array; // length (px) — origin to impact, or full range if it hit nothing
+  len: Float32Array; // length (px) — origin to its reflection point (or max reach if none)
+  width: Float32Array; // thickness multiplier — shrinks each reflection
   count: number;
 }
 
@@ -158,6 +161,7 @@ export function createGameState(seed: number): GameState {
       oy: new Float32Array(MAX_LASER_SEGMENTS),
       angle: new Float32Array(MAX_LASER_SEGMENTS),
       len: new Float32Array(MAX_LASER_SEGMENTS),
+      width: new Float32Array(MAX_LASER_SEGMENTS),
       count: 0,
     },
     whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),

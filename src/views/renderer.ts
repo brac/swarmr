@@ -437,7 +437,8 @@ export class Renderer {
           const beam = beams[k]!;
           beam.position.set(segs.ox[k]!, segs.oy[k]!);
           beam.rotation = segs.angle[k]!;
-          beam.scale.set(segs.len[k]! / LASER.range, 1); // shorten to the segment
+          // x → segment length; y → its (shrinking) thickness.
+          beam.scale.set(segs.len[k]! / LASER.range, segs.width[k]!);
           beam.alpha = alpha;
           beam.visible = true;
         }

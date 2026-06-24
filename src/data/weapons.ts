@@ -101,17 +101,19 @@ export const LASER = {
   range: 2500, // beam length (px) — overshoots the world diagonal so it always runs off-screen
   width: 18, // beam thickness (px); half-width is the hit test's perpendicular limit
   rehitCooldown: 0.1, // per-enemy seconds between beam ticks (→ ~3 hits over a blast)
-  // Prism (evolution) — fires on the SAME cadence as the base beam. Every beam
-  // pierces through and runs off screen; at its first impact it forks into new
-  // beams, which pierce + fork again up to a depth cap. Chain-lightning that never
-  // stops short. See docs/05.
+  // Prism (evolution) — fires on the SAME cadence as the base beam, but UNLIKE the
+  // base beam it does NOT run off screen: each beam stops at what it reflects off
+  // of, splits into two, and shrinks (shorter reach + thinner). Gone after 5
+  // reflections. Chain-lightning that fizzles out. See docs/05.
   evo: {
     // Three fork directions around the incoming heading, but the center one (which
-    // would run straight ahead, redundant with the piercing main beam) is dropped —
-    // so each reflection emits the two outer beams, splayed at ±splitSpread.
+    // would run straight ahead) is dropped — so each reflection emits the two outer
+    // beams, splayed at ±splitSpread.
     forks: 3,
-    maxDepth: 3, // a beam at depth < maxDepth may fork (root is depth 0)
+    maxDepth: 5, // a beam at depth < maxDepth may reflect (root is depth 0 → 5 reflects)
     splitSpread: 0.5, // rad between an outer fork and the (dropped) center
+    rangeShrink: 0.62, // each reflection reaches 62% as far as its parent
+    widthShrink: 0.8, // ...and is 80% as thick (the beam "gets smaller")
     duration: 1.0, // beam stays ON for 1000ms (longer than the base 300ms blast)
     damageMult: 0.5, // ...but hits softer per tick to offset the longer uptime
   },
