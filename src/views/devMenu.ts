@@ -42,6 +42,8 @@ export class DevMenu {
       font: "12px/1.3 monospace",
       color: "#e6ebf5",
       width: "260px",
+      maxHeight: "92vh",
+      overflowY: "auto",
       pointerEvents: "auto",
       userSelect: "none",
     } as CSSStyleDeclaration);
@@ -119,6 +121,46 @@ export class DevMenu {
     return b;
   }
 
+  // A "label [number input]" row. Typing a value sets it live (on change, not
+  // per-keystroke) without re-rendering, so the field keeps focus while tuning.
+  private numberField(
+    label: string,
+    value: number,
+    step: number,
+    onSet: (v: number) => void,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    Object.assign(row.style, {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "8px",
+    } as CSSStyleDeclaration);
+    const lbl = document.createElement("div");
+    lbl.textContent = label;
+    lbl.style.color = "#aab2c5";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = String(step);
+    input.value = String(Math.round(value * 1000) / 1000);
+    input.tabIndex = -1;
+    Object.assign(input.style, {
+      width: "82px",
+      background: "#1d2433",
+      border: "1px solid #2a3142",
+      borderRadius: "5px",
+      color: "#cdd7ea",
+      font: "11px monospace",
+      padding: "2px 4px",
+    } as CSSStyleDeclaration);
+    input.addEventListener("change", () => {
+      const v = Number(input.value);
+      if (Number.isFinite(v)) onSet(v);
+    });
+    row.append(lbl, input);
+    return row;
+  }
+
   private render(): void {
     if (!this.open) return;
     const s = this.getState();
@@ -190,6 +232,41 @@ export class DevMenu {
     });
     spawn.append(spawnLabel, slider);
     this.root.appendChild(spawn);
+
+    // Uncapped passives / player stats — type a value to set it live (these
+    // upgrades never max, so tune their effective values directly here).
+    const psep = document.createElement("div");
+    psep.style.borderTop = "1px solid #2a3142";
+    psep.style.margin = "4px 0 2px";
+    this.root.appendChild(psep);
+    const ptitle = document.createElement("div");
+    ptitle.textContent = "passives / stats";
+    ptitle.style.color = "#8fa0bd";
+    this.root.appendChild(ptitle);
+
+    const fields = document.createElement("div");
+    Object.assign(fields.style, { display: "flex", flexDirection: "column", gap: "3px" } as CSSStyleDeclaration);
+    fields.append(
+      this.numberField("Damage ×", s.passives.damageMult, 0.1, (v) => {
+        this.getState().passives.damageMult = v;
+      }),
+      this.numberField("Fire rate ×", s.passives.fireRateMult, 0.05, (v) => {
+        this.getState().passives.fireRateMult = v;
+      }),
+      this.numberField("AoE ×", s.passives.aoeMult, 0.1, (v) => {
+        this.getState().passives.aoeMult = v;
+      }),
+      this.numberField("Move speed", s.player.speed, 10, (v) => {
+        this.getState().player.speed = v;
+      }),
+      this.numberField("Magnet radius", s.player.magnetRadius, 10, (v) => {
+        this.getState().player.magnetRadius = v;
+      }),
+      this.numberField("Pickup radius", s.player.pickupRadius, 5, (v) => {
+        this.getState().player.pickupRadius = v;
+      }),
+    );
+    this.root.appendChild(fields);
 
     // Global helpers.
     const sep = document.createElement("div");
