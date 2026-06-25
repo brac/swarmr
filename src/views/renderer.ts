@@ -351,8 +351,13 @@ export class Renderer {
 
   /** Scale-to-fit the world into the canvas, centered, with letterbox bars. */
   private layout = (): void => {
-    const sw = this.app.renderer.width / (window.devicePixelRatio || 1);
-    const sh = this.app.renderer.height / (window.devicePixelRatio || 1);
+    // Use the renderer's *logical* screen size (CSS pixels). The scene graph works
+    // in logical coordinates — resolution (devicePixelRatio) is applied later at the
+    // GPU projection — so we must NOT divide by dpr here. The old `renderer.width /
+    // devicePixelRatio` double-counted resolution (renderer.width is already logical)
+    // and shrank the whole world to 1/dpr on HiDPI/Retina displays, leaving it pinned
+    // in the upper-left at half size.
+    const { width: sw, height: sh } = this.app.renderer.screen;
     const scale = Math.min(sw / WORLD_W, sh / WORLD_H);
     this.world.scale.set(scale);
     this.world.position.set(
