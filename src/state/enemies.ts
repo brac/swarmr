@@ -6,11 +6,17 @@
 // Stats are per-enemy (denormalized from the type at spawn) so variety costs the
 // hot loops nothing beyond an extra array read.
 
-import { ENEMY_TYPES, MOVE_STRAIGHT_LEFT, MOVE_HOMING } from "../data/enemies";
+import {
+  ENEMY_TYPES,
+  MOVE_STRAIGHT_LEFT,
+  MOVE_HOMING,
+  MOVE_SINE,
+  MOVE_WALL,
+} from "../data/enemies";
 
 // Movement behaviors live with the type data (data/enemies); re-exported here so
 // the movement system and spawner keep importing them from the enemy state module.
-export { MOVE_STRAIGHT_LEFT, MOVE_HOMING };
+export { MOVE_STRAIGHT_LEFT, MOVE_HOMING, MOVE_SINE, MOVE_WALL };
 
 export class Enemies {
   readonly capacity: number;
@@ -32,6 +38,7 @@ export class Enemies {
   readonly xpValue: Int32Array; // XP dropped on death
   readonly type: Uint8Array; // ENEMY_TYPES index
   readonly move: Uint8Array; // MOVE_* behavior
+  readonly moveData: Float32Array; // per-enemy movement scalar (sine phase; 0 otherwise)
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -49,6 +56,7 @@ export class Enemies {
     this.xpValue = new Int32Array(capacity);
     this.type = new Uint8Array(capacity);
     this.move = new Uint8Array(capacity);
+    this.moveData = new Float32Array(capacity);
   }
 
   /**
@@ -61,6 +69,7 @@ export class Enemies {
     type: number,
     hpScale: number,
     move?: number,
+    moveData = 0,
   ): number {
     if (this.count >= this.capacity) return -1;
     const t = ENEMY_TYPES[type]!;
@@ -80,6 +89,7 @@ export class Enemies {
     this.type[i] = type;
     // Caller may override, else the type declares its own behavior.
     this.move[i] = move ?? t.move ?? MOVE_STRAIGHT_LEFT;
+    this.moveData[i] = moveData; // sine phase (or 0)
     return i;
   }
 
@@ -104,5 +114,6 @@ export class Enemies {
     this.xpValue[i] = this.xpValue[last]!;
     this.type[i] = this.type[last]!;
     this.move[i] = this.move[last]!;
+    this.moveData[i] = this.moveData[last]!;
   }
 }

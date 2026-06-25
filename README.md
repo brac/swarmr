@@ -17,6 +17,8 @@ The genre is light on rendering and heavy on entity throughput, so swarmr is bui
 
 Enemies stream in from the right and the roster widens over time: fast **runners** (0:20) and **goblin** packs (1:00), heavy **tanks** (1:30), armored **biters** (3:00) and shelled **carapaces** (5:00). The two apex elites — the homing **hellhound** and the glass-cannon **serpent** — are held back until **7:00**, so the hardest mobs only show up late. Every enemy also gains HP as the clock climbs.
 
+They don't all move the same: some weave in on a **sine wave**, fast **rush packs** charge straight at you as a group, and slow **walls** of high-HP mobs advance and close in to pin you. Read the movement, not just the count.
+
 ### Controls
 
 | Key | Action |

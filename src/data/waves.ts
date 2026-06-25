@@ -49,3 +49,29 @@ export const DIFFICULTY = {
     { t: 540, w: [0.16, 0.15, 0.11, 0.12, 0.13, 0.12, 0.11, 0.1] }, // 9:00 — elites ramp
   ],
 } as const;
+
+// Set-piece formations, spawned in addition to the ambient stream on a sim-time
+// cadence. Two flavors: a RUSH pack (a tight cluster of fast mobs that homes the
+// player as a group) and a WALL (a vertical line of slow, high-HP mobs that advances
+// and closes toward the player's row — the "smush"). Counts are deliberately modest
+// so they read as events, not a second swarm. Enemy type indices reference
+// ENEMY_TYPES (1 = Runner, 5 = Carapace).
+export const FORMATIONS = {
+  firstAt: 75, // s before the first formation event
+  interval: 20, // s between events…
+  jitter: 6, // …±this many seconds (seeded)
+  rush: {
+    startAt: 75, // rushes begin here
+    type: 1, // Runner — fast
+    count: 20, // mobs per pack
+    spreadX: 170, // how deep the cluster stacks behind the right edge (px)
+    spreadY: 110, // cluster half-height (px)
+  },
+  wall: {
+    startAt: 165, // 2:45 — walls join the rotation later
+    type: 5, // Carapace — slow HP sponge
+    count: 11, // mobs in the vertical line
+    marginY: 80, // keep the ends off the very top/bottom (px)
+    staggerX: 70, // slight per-mob depth stagger so they don't share one hash cell (px)
+  },
+} as const;

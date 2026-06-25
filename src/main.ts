@@ -14,7 +14,7 @@ import { UpgradeMenu } from "./views/upgradeMenu";
 import { DevMenu } from "./views/devMenu";
 import { rollUpgrades } from "./systems/upgrades";
 import { levelUp, levelDown } from "./systems/gems";
-import { updateSpawn } from "./systems/spawn";
+import { updateSpawn, updateFormations } from "./systems/spawn";
 import { updatePlayer, updateEnemies } from "./systems/movement";
 import { rebuildHash } from "./systems/broadphase";
 import { updateContact } from "./systems/contactDamage";
@@ -173,6 +173,7 @@ async function main(): Promise<void> {
       if (state.levelUpsPending > 0) return; // paused while choosing an upgrade
 
       updateSpawn(state); // ramp the swarm to target
+      updateFormations(state); // set-piece rush packs / advancing walls on a cadence
       updatePlayer(state, input, dt); // WASD
       updateEnemies(state, dt); // seek the player
       rebuildHash(state); // register every enemy (positions now final this tick)

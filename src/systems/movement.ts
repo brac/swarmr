@@ -4,8 +4,8 @@
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
 import type { Input } from "../core/input";
-import { ENEMY } from "../data/enemies";
-import { MOVE_HOMING } from "../state/enemies";
+import { ENEMY, MOVE_TUNING } from "../data/enemies";
+import { MOVE_HOMING, MOVE_SINE, MOVE_WALL } from "../state/enemies";
 
 // Enemies that stream past the player and off the left edge are despawned here
 // (they'd otherwise drift forever off-screen, eating the capacity). Generous
@@ -45,8 +45,10 @@ export function updateEnemies(state: GameState, dt: number): void {
   const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
+  const time = state.time;
   const speeds = e.speed;
   const move = e.move;
+  const moveData = e.moveData;
   const sepR2 = ENEMY.sepRadius * ENEMY.sepRadius;
   const sepStrength = ENEMY.sepStrength;
   const n = e.count;
@@ -73,8 +75,9 @@ export function updateEnemies(state: GameState, dt: number): void {
     // Base velocity by movement type.
     let vx: number;
     let vy: number;
-    if (move[i] === MOVE_HOMING) {
-      // Seek the player as a unit vector × this enemy's speed.
+    const m = move[i]!;
+    if (m === MOVE_HOMING) {
+      // Seek the player as a unit vector × this enemy's speed (elites + rush packs).
       vx = px - ex;
       vy = py - ey;
       const d2 = vx * vx + vy * vy;
@@ -86,6 +89,21 @@ export function updateEnemies(state: GameState, dt: number): void {
         vx = 0;
         vy = 0;
       }
+    } else if (m === MOVE_SINE) {
+      // Drift left, weaving vertically. vy is the derivative of A·sin(ωt+φ), so the
+      // position integrates into a clean serpentine (and separation still adds on top).
+      vx = -speeds[i]!;
+      vy =
+        MOVE_TUNING.sineAmp *
+        MOVE_TUNING.sineFreq *
+        Math.cos(MOVE_TUNING.sineFreq * time + moveData[i]!);
+    } else if (m === MOVE_WALL) {
+      // Advance left slowly (its own slow speed) while sliding toward the player's
+      // row — a wall that closes in to smush. Don't overshoot past the player's y.
+      vx = -speeds[i]!;
+      const dy = py - ey;
+      const step = MOVE_TUNING.wallVertSpeed;
+      vy = dy > step * dt ? step : dy < -step * dt ? -step : dy / (dt || 1);
     } else {
       // Straight right-to-left at this enemy's speed (side-scroller default).
       vx = -speeds[i]!;

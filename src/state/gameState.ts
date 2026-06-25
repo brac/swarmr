@@ -15,6 +15,7 @@ import { createWeaponState } from "./weapons";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
 import { XP } from "../data/xp";
+import { FORMATIONS } from "../data/waves";
 
 // Internal world dimensions. Gameplay math is always in these coordinates; the
 // renderer letterboxes them to the actual viewport.
@@ -115,6 +116,7 @@ export interface GameState {
   levelUpsPending: number; // level-ups awaiting an upgrade choice; >0 pauses the sim
   levelingEnabled: boolean; // debug: when false, XP grants no levels (toggle with K)
   spawnTargetOverride: number; // dev: -1 = use the ramp; ≥0 pins the live spawn cap
+  nextFormationAt: number; // sim-time of the next set-piece formation (rush pack / wall)
   gemsDropped: number; // gems released so far this run (quota toward XP.runTotal)
   boss: Boss; // the 10-minute finale (inactive until then)
   won: boolean; // boss defeated; the sim freezes on the victory screen
@@ -182,6 +184,7 @@ export function createGameState(seed: number): GameState {
     levelUpsPending: 1,
     levelingEnabled: true,
     spawnTargetOverride: -1,
+    nextFormationAt: FORMATIONS.firstAt,
     gemsDropped: 0,
     boss: {
       active: false,

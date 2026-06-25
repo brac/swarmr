@@ -6,7 +6,17 @@
 // Per-enemy movement behavior. Lives here (with the type data) so a type can
 // declare how it moves; state/enemies re-exports these for the movement system.
 export const MOVE_STRAIGHT_LEFT = 0; // drift straight right-to-left at own speed
-export const MOVE_HOMING = 1; // seek the player (used by the late-game elites)
+export const MOVE_HOMING = 1; // seek the player (elites; also rush packs)
+export const MOVE_SINE = 2; // drift left while weaving up/down on a sine wave
+export const MOVE_WALL = 3; // advance left slowly while closing toward the player's row
+
+// Tuning for the non-trivial movement modes (read by the movement system).
+export const MOVE_TUNING = {
+  sineAmp: 95, // px — vertical amplitude of the serpentine weave
+  sineFreq: 2.2, // rad/s — how fast the weave oscillates
+  sineChance: 0.22, // fraction of ambient straight-left spawns that weave instead
+  wallVertSpeed: 24, // px/s — how fast a wall mob slides toward the player's row (the "smush")
+} as const;
 
 export interface EnemyType {
   radius: number; // collision radius (px)
