@@ -17,6 +17,11 @@ export class Input {
     window.addEventListener("blur", () => this.down.clear());
   }
 
+  /** True while the given key code is held (e.g. "Space" for the Ultimate charge). */
+  isHeld(code: string): boolean {
+    return this.down.has(code);
+  }
+
   /** -1 left, +1 right, 0 none. */
   axisX(): number {
     let x = 0;

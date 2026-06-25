@@ -6,7 +6,7 @@
 
 import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H } from "../state/gameState";
-import { PROJ_AXE } from "../state/projectiles";
+import { PROJ_AXE, PROJ_LIGHT } from "../state/projectiles";
 import { AXE } from "../data/weapons";
 
 const OFF_MARGIN = 64;
@@ -19,16 +19,33 @@ export function updateProjectiles(state: GameState, dt: number): void {
     if (g !== 0) p.velY[i]! += g * dt; // arc
 
     const x = (p.posX[i]! += p.velX[i]! * dt);
-    const y = (p.posY[i]! += p.velY[i]! * dt);
+    let y = (p.posY[i]! += p.velY[i]! * dt);
     p.life[i]! -= dt;
+
+    const kind = p.kind[i]!;
+
+    // Piercing Light reflects off the top/bottom edges (flip velY, clamp back to
+    // the edge) until its bounce budget runs out — then it sails off and despawns.
+    if (kind === PROJ_LIGHT && p.reflectionsLeft[i]! > 0) {
+      if (y < 0) {
+        y = p.posY[i]! = 0;
+        p.velY[i]! = -p.velY[i]!;
+        p.reflectionsLeft[i]!--;
+      } else if (y > WORLD_H) {
+        y = p.posY[i]! = WORLD_H;
+        p.velY[i]! = -p.velY[i]!;
+        p.reflectionsLeft[i]!--;
+      }
+    }
 
     let dead = p.life[i]! <= 0;
     if (!dead) {
-      if (p.kind[i] === PROJ_AXE) {
+      if (kind === PROJ_AXE) {
         p.spin[i]! += AXE.spinRate * dt; // tumble
         // Forward-arcing axes leave the right edge or fall off the bottom.
         dead = x > WORLD_W + OFF_MARGIN || y > WORLD_H + OFF_MARGIN;
       } else {
+        // Daggers and spent light rays pop once they leave any edge (+margin).
         dead =
           x < -OFF_MARGIN ||
           x > WORLD_W + OFF_MARGIN ||

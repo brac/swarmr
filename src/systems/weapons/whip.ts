@@ -1,17 +1,12 @@
-// REDESIGN (side-scroller): the front/back wedge wastes the "back" swing on empty
-// space — rethink as a rightward strike or vertical coverage of the incoming lane.
-// See BACKLOG.md "Side-scroller weapon redesigns".
+// Whip — now a melee SWORD. The lesson it still forces: a non-projectile, area-
+// overlap damage source. Unlike the old auto-swing whip, the sword only activates
+// when an enemy is within striking range (`state.swordActive`, which the renderer
+// reads to swing the blade sprite). While active and off cooldown it cleaves every
+// enemy in a forward arc around the player in one instantaneous tick.
 //
-// Whip — weapon two. The lesson it forces: a non-projectile, area-overlap damage
-// source. No pooled mover, no travel time. On cooldown it picks the nearest enemy
-// as an aim direction, then damages every enemy inside a fixed wedge (range +
-// half-angle) in a single instantaneous tick.
-//
-// Death handling is intentionally outsourced: the whip only subtracts HP. The
-// collision system's end-of-tick compaction pass sweeps every hp<=0 enemy
-// (whip-killed or projectile-killed) — so the whip MUST run before collision.
-// That also means the hash indices it reads are all still valid (nothing has been
-// swap-removed yet this tick).
+// Death handling is outsourced: the sword only subtracts HP. Collision's end-of-tick
+// compaction sweeps every hp<=0 enemy, so the sword MUST run before collision (the
+// hash indices it reads are all still valid — nothing has been swap-removed yet).
 
 import type { GameState } from "../../state/gameState";
 import { WHIP } from "../../data/weapons";
@@ -22,50 +17,52 @@ import { rollHit } from "../combat";
 import { damageBoss } from "../boss";
 
 export function updateWhip(state: GameState, dt: number): void {
-  // Age out lingering swing visuals every tick, independent of the cooldown.
-  const ws = state.whipStrikes;
-  for (let i = ws.count - 1; i >= 0; i--) {
-    ws.age[i]! += dt;
-    if (ws.age[i]! >= WHIP.strikeTTL) ws.kill(i);
-  }
-
+  state.swordActive = false; // default; set true below if a target is in range
   const wstat = state.weapons.whip;
-  if (wstat.level < 1) return; // not acquired (strikes still aged above for any lingering visual)
-  state.whipTimer -= dt;
-  if (state.whipTimer > 0) return;
+  if (wstat.level < 1) return; // not acquired
 
   const px = state.player.pos.x;
   const py = state.player.pos.y;
-  const target = nearestEnemy(state, px, py);
-  if (target === -1) {
-    state.whipTimer = 0; // hold at 0 so we swing the instant an enemy appears
-    return;
-  }
+  const evolved = wstat.evolved;
+  const range = evolved ? WHIP.evo.range : WHIP.range;
 
-  // Global Damage passive folds into the swing's damage once, up front.
+  // The sword swings only when the nearest enemy is within striking range.
+  const e = state.enemies;
+  const target = nearestEnemy(state, px, py);
+  let inRange = false;
+  if (target !== -1) {
+    const dx = e.posX[target]! - px;
+    const dy = e.posY[target]! - py;
+    inRange = dx * dx + dy * dy <= range * range;
+  }
+  // The boss can also keep the blade swinging even when the swarm is clear.
+  const b = state.boss;
+  if (!inRange && b.active) {
+    const dx = b.pos.x - px;
+    const dy = b.pos.y - py;
+    const reach = range + BOSS.radius;
+    inRange = dx * dx + dy * dy <= reach * reach;
+  }
+  state.swordActive = inRange;
+
+  // Cool down toward ready, but never below 0 — otherwise the timer accumulates a
+  // large negative value while no mob is in range and, on first contact, fires a
+  // burst of swings (one per tick) that deletes the mob instantly.
+  state.whipTimer -= dt;
+  if (state.whipTimer < 0) state.whipTimer = 0;
+  if (!inRange || state.whipTimer > 0) return; // not ready / nothing to hit
+
+  // Global Damage passive folds into the swing once, up front.
   const damage = wstat.damage * state.passives.damageMult;
 
-  const evolved = wstat.evolved;
-  const e = state.enemies;
-  // Aim unit vector toward the nearest enemy.
-  const adx = e.posX[target]! - px;
-  const ady = e.posY[target]! - py;
-  const invLen = 1 / Math.sqrt(adx * adx + ady * ady || 1);
-  // Reaper flips the aim 180° on alternate swings → a front/back/front rhythm.
-  const flip = evolved && state.whipBack ? -1 : 1;
-  if (evolved) state.whipBack = !state.whipBack;
-  const ux = adx * invLen * flip;
-  const uy = ady * invLen * flip;
-  const angle = Math.atan2(uy, ux);
-
-  // Walk the cell block covering the wedge's bounding box; damage every enemy
-  // within range AND within the arc. Arc test is a dot product vs cos(halfAngle)
-  // — no atan2 per enemy. Reaper (evolved) keeps the wedge but reaches farther.
-  const range = evolved ? WHIP.evo.range : WHIP.range;
+  // Damage everyone in the forward arc: within `range`, ahead of the player
+  // (dx >= -back), and within ±arcHalfAngle of straight forward (+x). The arc test
+  // is a dot product vs cos(halfAngle) — no atan2 per enemy. Walk the hash cells
+  // covering the strike box.
   const range2 = range * range;
   const cosHalf = Math.cos(WHIP.arcHalfAngle);
   const h = state.hash;
-  const cxLo = h.clampCX(px - range);
+  const cxLo = h.clampCX(px - WHIP.back);
   const cxHi = h.clampCX(px + range);
   const cyLo = h.clampCY(py - range);
   const cyHi = h.clampCY(py + range);
@@ -74,7 +71,7 @@ export function updateWhip(state: GameState, dt: number): void {
   const posY = e.posY;
   const hp = e.hp;
   const hitTimer = e.hitTimer;
-  const radius = e.radius; // per-enemy radius array
+  const radius = e.radius;
   const cellStart = h.cellStart;
   const items = h.items;
   const gridW = h.gridW;
@@ -91,39 +88,38 @@ export function updateWhip(state: GameState, dt: number): void {
         const dy = posY[j]! - py;
         const d2 = dx * dx + dy * dy;
         if (d2 > range2 || d2 < 1e-6) continue;
-        // Inside the wedge? cos of the angle between aim and enemy ≥ cos(half).
+        if (dx < -WHIP.back) continue; // behind the player
+        // Forward arc: cos of the angle between +x and the enemy ≥ cos(half).
         const invd = 1 / Math.sqrt(d2);
-        if ((dx * ux + dy * uy) * invd < cosHalf) continue;
+        if (dx * invd < cosHalf) continue;
 
         const roll = rollHit(state.rng, damage);
         hp[j]! -= roll.amount;
         hitTimer[j] = ENEMY.hitReactTime;
-        state.damageNumbers.spawn(
-          posX[j]!,
-          posY[j]! - radius[j]!,
-          roll.amount,
-          roll.crit ? 1 : 0,
-        );
+        state.damageNumbers.spawn(posX[j]!, posY[j]! - radius[j]!, roll.amount, roll.crit ? 1 : 0);
       }
     }
   }
 
-  // Boss (outside the hash): one hit per swing if it's inside the wedge.
-  const b = state.boss;
+  // Boss (outside the hash): one hit per swing if it's inside the arc.
   if (b.active) {
-    const bx = b.pos.x - px;
-    const by = b.pos.y - py;
-    const bd2 = bx * bx + by * by;
+    const dx = b.pos.x - px;
+    const dy = b.pos.y - py;
+    const bd2 = dx * dx + dy * dy;
     const reach = range + BOSS.radius;
-    if (bd2 > 1e-6 && bd2 <= reach * reach) {
-      const invd = 1 / Math.sqrt(bd2);
-      if ((bx * ux + by * uy) * invd >= cosHalf) damageBoss(state, damage);
+    if (bd2 > 1e-6 && bd2 <= reach * reach && dx >= -WHIP.back) {
+      if (dx / Math.sqrt(bd2) >= cosHalf) damageBoss(state, damage);
     }
   }
 
-  ws.spawn(px, py, angle); // lingering visual; collision compacts the dead later
+  // Kick off the swing animation: stamp the start and flip the sweep direction so
+  // the blade alternates (a true back-and-forth). The renderer sweeps one arc over
+  // the cooldown, so the visible swing exactly matches this firing cadence.
+  state.swordSwingStart = state.time;
+  state.swordSwingDir = !state.swordSwingDir;
+
   // Global Fire Rate passive shortens the effective cooldown (faster = divide).
-  // Reaper swings on its own faster cadence to sell the front/back rhythm.
+  // Absolute assignment (not +=) so an already-zeroed timer can't bank extra swings.
   const cooldown = evolved ? WHIP.evo.cooldown : wstat.cooldown;
-  state.whipTimer += cooldown / state.passives.fireRateMult;
+  state.whipTimer = cooldown / state.passives.fireRateMult;
 }

@@ -21,7 +21,7 @@ interface WeaponProgress {
 export interface WeaponState {
   dagger: WeaponProgress & { cooldown: number; damage: number; count: number };
   whip: WeaponProgress & { cooldown: number; damage: number };
-  garlic: WeaponProgress & { radius: number; damage: number };
+  garlic: WeaponProgress & { cooldown: number; radius: number; damage: number };
   axe: WeaponProgress & { cooldown: number; damage: number };
   laser: WeaponProgress & { cooldown: number; damage: number };
 }
@@ -36,7 +36,13 @@ export function createWeaponState(): WeaponState {
       count: DAGGER.count,
     },
     whip: { level: 0, evolved: false, cooldown: WHIP.cooldown, damage: WHIP.damage },
-    garlic: { level: 0, evolved: false, radius: GARLIC.radius, damage: GARLIC.damage },
+    garlic: {
+      level: 0,
+      evolved: false,
+      cooldown: GARLIC.cooldown,
+      radius: GARLIC.radius,
+      damage: GARLIC.damage,
+    },
     axe: { level: 0, evolved: false, cooldown: AXE.cooldown, damage: AXE.damage },
     laser: { level: 0, evolved: false, cooldown: LASER.cooldown, damage: LASER.damage },
   };

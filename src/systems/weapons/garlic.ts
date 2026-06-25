@@ -1,132 +1,75 @@
-// REDESIGN (side-scroller): a player-centered aura is a poor fit now that threats
-// only come from the right — rethink as a forward cone / wall / trailing hazard.
-// See BACKLOG.md "Side-scroller weapon redesigns".
-//
-// Garlic — weapon three. The lesson it forces: a damage cooldown *per entity*.
-// Unlike the Dagger/Whip (which fire on a global cooldown), garlic is an always-on
-// aura. Every enemy inside the radius takes damage, but each enemy carries its own
-// next-eligible timestamp (garlicNextHit): once hit, it can't be hit again until
-// rehitCooldown has passed. That staggered per-enemy cadence — not a global pulse —
-// is the DoT pattern reused by every future zone/aura/poison effect.
-//
-// Implementing the cooldown as an absolute sim-time stamp (vs a countdown) means no
-// per-tick decrement pass over all enemies: we just compare against state.time.
-//
-// Like the Whip, garlic only subtracts HP; collision's end-of-tick compaction
-// sweeps the dead, so this must run before collision (indices stay valid here).
+// Garlic — now "Piercing Light". The lesson it forces is unchanged in spirit (a
+// continuous-pressure area weapon) but the shape is a fast REFLECTING projectile:
+// a single ray fired at 45° up or down, aimed toward the nearest enemy, that bounces
+// off the top/bottom world edges (see updateProjectiles) and pierces every body it
+// crosses. It rides the existing projectile pool + collision exactly like the Axe —
+// infinite pierce, and the shared per-enemy projectile re-hit gate stops one body
+// from soaking every tick — so this file only has to LAUNCH rays on a cooldown.
 
 import type { GameState } from "../../state/gameState";
 import { GARLIC } from "../../data/weapons";
-import { ENEMY } from "../../data/enemies";
-import { BOSS } from "../../data/boss";
-import { rollHit } from "../combat";
-import { damageBoss } from "../boss";
+import { PROJ_LIGHT, PIERCE_INFINITE } from "../../state/projectiles";
+import { nearestEnemy } from "../targeting";
 
-export function updateGarlic(state: GameState): void {
+export function updateGarlic(state: GameState, dt: number): void {
   const g = state.weapons.garlic;
-  const now = state.time;
+  if (g.level < 1) return; // not acquired — no rays
+  state.lightTimer -= dt;
+  if (state.lightTimer > 0) return;
 
-  // Black Aura tendrils fade out on sim-time; age any that exist every tick (even
-  // when the aura touches nothing, or the weapon was just toggled off).
-  if (state.tendrils.count > 0) ageTendrils(state, now);
-
-  if (g.level < 1) return; // not acquired — no aura damage
-  const e = state.enemies;
-  if (e.count === 0) return;
-
-  const h = state.hash;
   const px = state.player.pos.x;
   const py = state.player.pos.y;
 
-  // Global AoE passive scales the aura. Derive the effective radius once so every
-  // query below (bounds + distance test) and the renderer's aura visual agree —
-  // the renderer multiplies the same garlic radius by aoeMult on its scale line.
-  const auraRadius = g.radius * state.passives.aoeMult;
-  // Global Damage passive folds into garlic's per-hit damage.
+  // Aim toward the nearest enemy, snapped to ±45°: fire up if it's above us, down if
+  // below (horizontal component always forward). With no enemy, hold the cooldown at
+  // 0 so the next ray fires the instant one appears — don't waste shots into space.
+  const target = nearestEnemy(state, px, py);
+  if (target === -1) {
+    state.lightTimer = 0;
+    return;
+  }
+  const sy = state.enemies.posY[target]! < py ? -1 : 1; // up (−) or down (+)
+
+  // Global Damage passive folds in at the source; AoE passive fattens the beam.
   const damage = g.damage * state.passives.damageMult;
-  const r2 = auraRadius * auraRadius;
-  // Black Aura re-ticks faster (radius/damage are already folded into the live
-  // stats on evolve; see upgrades.ts).
-  const rehit = g.evolved ? GARLIC.evo.rehitCooldown : GARLIC.rehitCooldown;
+  const radius = g.radius * state.passives.aoeMult;
+  const reflections = GARLIC.maxReflections + (g.evolved ? GARLIC.evo.extraReflections : 0);
 
-  const cxLo = h.clampCX(px - auraRadius);
-  const cxHi = h.clampCX(px + auraRadius);
-  const cyLo = h.clampCY(py - auraRadius);
-  const cyHi = h.clampCY(py + auraRadius);
+  // 45° diagonal: equal forward (+x) and vertical components.
+  const vx = GARLIC.speed * Math.SQRT1_2;
+  const vy = GARLIC.speed * Math.SQRT1_2;
 
-  const posX = e.posX;
-  const posY = e.posY;
-  const hp = e.hp;
-  const hitTimer = e.hitTimer;
-  const nextHit = e.garlicNextHit;
-  const radius = e.radius; // per-enemy radius array
-  const cellStart = h.cellStart;
-  const items = h.items;
-  const gridW = h.gridW;
+  fireRay(state, px, py, vx, sy * vy, radius, damage, reflections);
+  // Refraction (evolved) fires the opposite diagonal too — one ray up, one down.
+  if (g.evolved) fireRay(state, px, py, vx, -sy * vy, radius, damage, reflections);
 
-  for (let gy = cyLo; gy <= cyHi; gy++) {
-    const rowBase = gy * gridW;
-    for (let gx = cxLo; gx <= cxHi; gx++) {
-      const c = rowBase + gx;
-      const end = cellStart[c + 1]!;
-      for (let pp = cellStart[c]!; pp < end; pp++) {
-        const j = items[pp]!;
-        if (hp[j]! <= 0) continue; // already dead this tick
-        if (now < nextHit[j]!) continue; // per-enemy cooldown still ticking
-        const dx = posX[j]! - px;
-        const dy = posY[j]! - py;
-        if (dx * dx + dy * dy > r2) continue; // outside the aura
-
-        const roll = rollHit(state.rng, damage);
-        hp[j]! -= roll.amount;
-        hitTimer[j] = ENEMY.hitReactTime;
-        state.damageNumbers.spawn(
-          posX[j]!,
-          posY[j]! - radius[j]!,
-          roll.amount,
-          roll.crit ? 1 : 0,
-        );
-        nextHit[j] = now + rehit;
-        // Flick a tendril from the player out to the struck enemy.
-        if (g.evolved) spawnTendril(state, px, py, posX[j]!, posY[j]!, now);
-      }
-    }
-  }
-
-  // Boss (outside the hash): tick it if it's inside the aura and off cooldown.
-  const b = state.boss;
-  if (b.active && now >= b.garlicNextHit) {
-    const dx = b.pos.x - px;
-    const dy = b.pos.y - py;
-    const reach = auraRadius + BOSS.radius; // scaled aura reaches the boss too
-    if (dx * dx + dy * dy <= reach * reach) {
-      damageBoss(state, damage);
-      b.garlicNextHit = now + BOSS.garlicCooldown;
-      if (g.evolved) spawnTendril(state, px, py, b.pos.x, b.pos.y, now);
-    }
-  }
+  // Global Fire Rate passive shortens the effective cooldown (faster = divide).
+  const cooldown = g.evolved ? GARLIC.cooldown * GARLIC.evo.cooldownMult : GARLIC.cooldown;
+  state.lightTimer += cooldown / state.passives.fireRateMult;
 }
 
-// Flick a tendril visual from the player (ox,oy) out to a struck target (tx,ty).
-function spawnTendril(
+// Spawn one light ray into the projectile pool and seed its bounce budget.
+function fireRay(
   state: GameState,
-  ox: number,
-  oy: number,
-  tx: number,
-  ty: number,
-  now: number,
+  x: number,
+  y: number,
+  vx: number,
+  vy: number,
+  radius: number,
+  damage: number,
+  reflections: number,
 ): void {
-  const dx = tx - ox;
-  const dy = ty - oy;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  state.tendrils.spawn(ox, oy, Math.atan2(dy, dx), len, now);
-}
-
-// Retire tendrils whose lifetime has elapsed (sim-time keyed, no dt needed).
-function ageTendrils(state: GameState, now: number): void {
-  const t = state.tendrils;
-  const ttl = GARLIC.evo.tendrilTTL;
-  for (let i = t.count - 1; i >= 0; i--) {
-    if (now - t.born[i]! >= ttl) t.kill(i);
-  }
+  const idx = state.projectiles.spawn(
+    x,
+    y,
+    vx,
+    vy,
+    GARLIC.lifetime,
+    radius,
+    damage,
+    PIERCE_INFINITE, // carve through every enemy until off-screen
+    0, // gravity off — straight lines between reflections
+    PROJ_LIGHT,
+  );
+  if (idx !== -1) state.projectiles.reflectionsLeft[idx] = reflections;
 }

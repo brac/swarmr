@@ -22,22 +22,22 @@ export const DAGGER = {
   },
 } as const;
 
-// Whip — a fixed-arc melee cleave, no projectile. On cooldown it sweeps a wedge
-// aimed at the nearest enemy and damages everyone inside it at once (area
-// overlap, not a moving entity). Instantaneous: one damage tick per swing, so no
-// per-enemy re-hit bookkeeping (that lesson is Garlic's). See CLAUDE.md build order.
+// Whip — now a melee SWORD (no projectile). It only swings when an enemy is within
+// striking range; each swing cleaves every enemy in a forward arc around the player
+// (area overlap, not a moving entity), instantaneous, so no per-enemy re-hit
+// bookkeeping (that lesson is Garlic's). The blade sprite swings back and forth fast
+// while active — a renderer animation driven by `swingFreq`/`swingArc`.
 export const WHIP = {
-  cooldown: 1.1, // seconds between swings
-  damage: 18,
-  range: 230, // reach (px)
-  arcHalfAngle: 0.7, // half-width of the wedge (rad) → ~80° full arc
-  strikeTTL: 0.18, // how long the swing graphic lingers/fades (s)
-  // Reaper (evolution) — keeps the wedge, but alternates the swing front → back →
-  // front on a faster cadence (the nearest-enemy aim is flipped 180° every other
-  // swing) at extended reach. See docs/05.
+  cooldown: 0.45, // seconds between damage swings (fast)
+  damage: 20,
+  range: 130, // strike radius (px) — melee; the sword only swings within this
+  arcHalfAngle: 1.4, // forward half-arc the damage covers (rad) → ~80° each way
+  back: 24, // small coverage behind the player so point-blank mobs are caught
+  swingArc: 1.0, // visual: ± blade rotation around its rest angle (rad); one sweep per swing
+  // Flurry (evolution) — same proximity sword, swinging ~2× faster with greater reach.
   evo: {
-    range: 300, // reach (px) — wider than the base 230
-    cooldown: 0.5, // faster swings drive the front/back rhythm
+    cooldown: 0.22, // ~2× faster swings
+    range: 170, // bigger reach (px) than the base 130
   },
 } as const;
 
@@ -73,23 +73,29 @@ export const AXE = {
   },
 } as const;
 
-// Garlic — a persistent aura centered on the player, no cooldown to "fire". Any
-// enemy inside the radius takes damage, but each enemy has its own re-hit cooldown
-// (the DoT cadence): once hit it can't be hit again for rehitCooldown seconds.
-// That per-entity cooldown is the lesson here — reused by every zone/DoT effect.
+// Garlic — now "Piercing Light": a single fast ray fired from the player at 45° up
+// or down, aimed toward the nearest enemy (snapped to the nearer diagonal). It rides
+// the projectile pool (kind PROJ_LIGHT, infinite pierce — like the Axe) and REFLECTS
+// off the top/bottom world edges up to `maxReflections` times before it stops
+// bouncing, then leaves the map. Piercing: it damages every enemy it crosses, gated
+// only by the shared per-enemy projectile re-hit cooldown.
+//
+// `radius` is the ray's hitbox half-thickness; the upgradeable `garlic.radius` stat
+// and the AoE passive scale it (a fatter beam). `damage` is per pierce hit.
 export const GARLIC = {
-  radius: 120, // aura radius (px)
-  damage: 7, // per hit
-  rehitCooldown: 0.45, // seconds before the same enemy can be hit again
-  // Black Aura (evolution) — wider, far harder, and faster-ticking; the renderer
-  // recolors it dark. radius/damage fold into the live stats on pickup (so the
-  // existing aura scaling just works); only the faster cadence is read at runtime.
-  // See docs/05.
+  cooldown: 0.8, // seconds between rays
+  damage: 10, // per pierce hit
+  speed: 1440, // px/s — ~2× the axe's 720 forward speed
+  radius: 13, // ray hitbox half-thickness (px) — skinny; garlic.radius stat + AoE passive scale it
+  lifetime: 4.0, // backstop despawn (s); normally exits the map first
+  maxReflections: 5, // bounces off top/bottom before it stops reflecting
+  angle: Math.PI / 4, // 45° up/down lean; the horizontal component is always forward
+  // Refraction (evolution) — fires BOTH the up and down ray each shot, with more
+  // bounces, on a slightly faster cadence. Read at fire time from `evolved` + evo.
   evo: {
-    radiusMult: 1.6, // applied to the live radius stat on evolve
-    damageMult: 3, // applied to the live damage stat on evolve
-    rehitCooldown: 0.28, // faster re-tick than the base 0.45
-    tendrilTTL: 0.18, // seconds a "reach out and zap" tendril lingers per hit
+    dual: true, // fire the up AND down ray together
+    extraReflections: 3, // → 8 total bounces
+    cooldownMult: 0.7, // fires a bit faster
   },
 } as const;
 

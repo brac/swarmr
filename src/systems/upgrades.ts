@@ -7,7 +7,6 @@
 
 import type { GameState } from "../state/gameState";
 import type { WeaponId } from "../state/weapons";
-import { GARLIC } from "../data/weapons";
 
 // Stat picks count toward a weapon's level (cap 4) or, when `weapon` is null, are
 // global passives that never gate. Evolutions are the 5th-pick payoff and flip
@@ -61,8 +60,8 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "whip_dmg",
-    name: "Heavy Whip",
-    desc: "+8 whip damage",
+    name: "Honed Edge",
+    desc: "+8 sword damage",
     weapon: "whip",
     kind: "stat",
     apply: (s) => {
@@ -71,8 +70,8 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "whip_rate",
-    name: "Crackdown",
-    desc: "Whip swings 18% faster",
+    name: "Swift Strikes",
+    desc: "Sword swings 18% faster",
     weapon: "whip",
     kind: "stat",
     apply: (s) => {
@@ -81,8 +80,8 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "garlic_dmg",
-    name: "Pungent",
-    desc: "+3 garlic damage",
+    name: "Searing",
+    desc: "+3 light damage",
     weapon: "garlic",
     kind: "stat",
     apply: (s) => {
@@ -91,8 +90,8 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "garlic_radius",
-    name: "Reek",
-    desc: "+25% garlic radius",
+    name: "Wide Beam",
+    desc: "+25% light ray thickness",
     weapon: "garlic",
     kind: "stat",
     apply: (s) => {
@@ -208,8 +207,8 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "whip_evo",
-    name: "Reaper",
-    desc: "The whip sweeps a full circle each swing",
+    name: "Flurry",
+    desc: "The sword swings twice as fast, with greater reach",
     weapon: "whip",
     kind: "evolution",
     apply: (s) => {
@@ -218,17 +217,14 @@ export const UPGRADES: Upgrade[] = [
   },
   {
     id: "garlic_evo",
-    name: "Black Aura",
-    desc: "Garlic darkens into a searing, far-reaching aura",
+    name: "Refraction",
+    desc: "Light fires both up and down, with more bounces",
     weapon: "garlic",
     kind: "evolution",
     apply: (s) => {
+      // Evolved behavior (dual rays, extra reflections, faster cadence) is read at
+      // fire time from `evolved` + GARLIC.evo, like the axe/laser evolutions.
       s.weapons.garlic.evolved = true;
-      // Fold the bigger/harder aura into the live stats so the existing aura
-      // scaling (gameplay + renderer) tracks it; the faster re-tick is read in
-      // garlic.ts. The recolor is the renderer's job.
-      s.weapons.garlic.radius *= GARLIC.evo.radiusMult;
-      s.weapons.garlic.damage *= GARLIC.evo.damageMult;
     },
   },
   {

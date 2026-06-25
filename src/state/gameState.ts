@@ -9,8 +9,6 @@ import { SpatialHash } from "../core/spatialHash";
 import { Enemies } from "./enemies";
 import { Projectiles, PROJECTILE_CAPACITY } from "./projectiles";
 import { DamageNumbers, DAMAGE_NUMBER_CAPACITY } from "./damageNumbers";
-import { WhipStrikes, WHIP_STRIKE_CAPACITY } from "./whipStrikes";
-import { Tendrils, TENDRIL_CAPACITY } from "./tendrils";
 import { Gems } from "./gems";
 import type { WeaponState } from "./weapons";
 import { createWeaponState } from "./weapons";
@@ -95,16 +93,21 @@ export interface GameState {
   projectiles: Projectiles;
   damageNumbers: DamageNumbers;
   daggerTimer: number; // seconds until the Dagger may fire again
-  whipTimer: number; // seconds until the Whip may swing again
-  whipBack: boolean; // Reaper evolution: flips each swing for the front/back rhythm
+  whipTimer: number; // seconds until the Sword may swing again
+  swordActive: boolean; // an enemy is in striking range → renderer shows the blade
+  swordSwingStart: number; // sim-time the current swing began (drives the sweep animation)
+  swordSwingDir: boolean; // alternates each swing → a true back-and-forth motion
+  lightTimer: number; // seconds until Piercing Light may fire again
   axeTimer: number; // seconds until the Axe may throw again
   laserTimer: number; // seconds until the Laser may fire again
   laserActive: number; // seconds the beam stays ON this blast (0 = beam off)
   laserDirX: number; // beam heading, locked from player facing at trigger time
   laserDirY: number;
   laserSegments: LaserSegments; // Prism's segment tree for this tick (evolved laser)
-  whipStrikes: WhipStrikes; // lingering swing visuals
-  tendrils: Tendrils; // Black Aura damage tendrils (evolved garlic)
+  ultCharge: number; // seconds Space has been held toward the Ultimate (0…chargeTime)
+  ultActive: number; // seconds of Ultimate beam left this fire (0 = off)
+  ultLocked: boolean; // true after a fire until Space is released (no instant recharge)
+  ultPrevHp: number; // player HP last tick — a drop cancels the charge (hits interrupt)
   gems: Gems; // XP drops
   weapons: WeaponState; // mutable per-run weapon stats (upgrades modify these)
   passives: Passives; // global multipliers spanning all weapons (upgrades modify these)
@@ -147,7 +150,10 @@ export function createGameState(seed: number): GameState {
     damageNumbers: new DamageNumbers(DAMAGE_NUMBER_CAPACITY),
     daggerTimer: 0,
     whipTimer: 0,
-    whipBack: false,
+    swordActive: false,
+    swordSwingStart: -1000, // far in the past → no swing animating at start
+    swordSwingDir: false,
+    lightTimer: 0,
     axeTimer: 0,
     laserTimer: 0,
     laserActive: 0,
@@ -161,8 +167,10 @@ export function createGameState(seed: number): GameState {
       width: new Float32Array(MAX_LASER_SEGMENTS),
       count: 0,
     },
-    whipStrikes: new WhipStrikes(WHIP_STRIKE_CAPACITY),
-    tendrils: new Tendrils(TENDRIL_CAPACITY),
+    ultCharge: 0,
+    ultActive: 0,
+    ultLocked: false,
+    ultPrevHp: PLAYER.maxHp,
     gems: new Gems(XP.capacity),
     weapons: createWeaponState(),
     // Fresh object on each createGameState → restart resets every passive to 1.0.

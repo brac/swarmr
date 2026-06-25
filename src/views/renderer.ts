@@ -20,21 +20,19 @@ import type { GameState } from "../state/gameState";
 import { WORLD_W, WORLD_H, MAX_LASER_SEGMENTS } from "../state/gameState";
 import { ENEMY } from "../data/enemies";
 import { PLAYER } from "../data/player";
-import { DAGGER, WHIP, GARLIC, AXE, LASER } from "../data/weapons";
+import { DAGGER, WHIP, AXE, LASER } from "../data/weapons";
+import { ULTIMATE } from "../data/ultimate";
 import { XP, LEVEL } from "../data/xp";
 import { BOSS } from "../data/boss";
 import type { Enemies } from "../state/enemies";
 import type { Projectiles } from "../state/projectiles";
-import { PROJECTILE_CAPACITY, PROJ_AXE } from "../state/projectiles";
+import { PROJECTILE_CAPACITY, PROJ_AXE, PROJ_LIGHT } from "../state/projectiles";
 import type { DamageNumbers } from "../state/damageNumbers";
 import { DAMAGE_NUMBER_CAPACITY, DN_TTL } from "../state/damageNumbers";
-import { WHIP_STRIKE_CAPACITY } from "../state/whipStrikes";
-import { TENDRIL_CAPACITY } from "../state/tendrils";
 
 // Where inactive pooled particles sit — well outside the 1920x1080 world so they
 // never draw. Position is dynamic, so parking here is a cheap per-frame write.
 const OFFSCREEN = -10000;
-const TENDRIL_BASE_LEN = 100; // unit length a tendril Graphics is drawn at; scaled per use
 const FLOOR_SCROLL_SPEED = 200; // px/sec the floor drifts left → reads as forward travel
 
 // Crit damage numbers: bigger and red so they read instantly over the swarm.
@@ -58,6 +56,7 @@ const T_ENEMY = [108, 122, 109, 112, 110, 124, 111, 123];
 const T_BOSS = 121; // skull-wraith
 const T_DAGGER = 103;
 const T_AXE = 118;
+const T_SWORD = 104; // blade tile reused for the melee sword (tune in-game)
 
 // A 16px sprite covers ~4× the entity radius (overhang beyond the hitbox reads
 // better — characters look chunkier than their collision circle).
@@ -73,7 +72,7 @@ export class Renderer {
   private world = new Container();
   private floor!: TilingSprite; // scrolls left to sell the side-scroller's forward travel
   private playerSprite = new Sprite();
-  private garlicAura = new Graphics(); // persistent damage aura around the player
+  private swordSprite = new Sprite(); // melee blade; swings (rotates) while an enemy is in range
   private shownGod = false; // last-applied god-mode tint state (gate the tint write)
 
   // Swarm: one batched ParticleContainer per enemy type (each its own sprite
@@ -99,6 +98,12 @@ export class Renderer {
   private axeParticles: Particle[] = [];
   private axeHigh = 0;
 
+  // Piercing Light layer: glowing streak particles, routed by kind from the same
+  // projectile SoA, rotated to travel direction (additive blend for a light look).
+  private lightContainer!: ParticleContainer;
+  private lightParticles: Particle[] = [];
+  private lightHigh = 0;
+
   // XP gem layer: pooled particles, position-only dynamic, one shared gem texture.
   private gemContainer!: ParticleContainer;
   private gemParticles: Particle[] = [];
@@ -110,18 +115,10 @@ export class Renderer {
   // Boss: a big scaled sprite, tinted crimson and flashed toward white on hit.
   private bossSprite = new Sprite();
 
-  // Whip strikes: a small pool of wedge Graphics, each drawn once at the canonical
-  // aim (pointing +x). Per active strike we set position/rotation/alpha — no
-  // per-frame geometry rebuild. Inactive ones are hidden.
-  private whipLayer = new Container();
-  private whipGraphics: Graphics[] = [];
-  private whipHigh = 0;
-
-  // Black Aura tendrils (evolved garlic): pooled thin-line Graphics, drawn once at
-  // a unit length pointing +x; per active tendril we place/rotate/scale/fade one.
-  private tendrilLayer = new Container();
-  private tendrilGraphics: Graphics[] = [];
-  private tendrilHigh = 0;
+  // Ultimate: a wide blue beam (one Graphics, drawn once pointing +x) and a charge
+  // ring that tightens/brightens around the player as Space is held.
+  private ultBeam = new Graphics();
+  private ultRing = new Graphics();
 
   // Laser beams: a pool of identical Graphics drawn once pointing +x. The base
   // weapon uses one (rotated to the locked heading); the Prism evolution uses the
@@ -180,13 +177,13 @@ export class Renderer {
     this.playerSprite.anchor.set(0.5);
     this.playerSprite.scale.set(PLAYER.radius * SPRITE_PER_RADIUS);
 
-    // Garlic aura: a faint greenish disc with a soft ring, drawn once at origin
-    // and moved to the player each frame. Alpha pulses gently for an "aura" feel.
-    this.garlicAura
-      .circle(0, 0, GARLIC.radius)
-      .fill({ color: 0x88ff88, alpha: 0.06 })
-      .circle(0, 0, GARLIC.radius)
-      .stroke({ width: 2, color: 0x88ff88, alpha: 0.25 });
+    // Sword: a blade sprite anchored at the hilt (bottom-center) so it pivots from
+    // the grip. The render loop points it forward and swings it back and forth while
+    // an enemy is in striking range (state.swordActive); hidden otherwise.
+    this.swordSprite.texture = this.tile(atlas, T_SWORD);
+    this.swordSprite.anchor.set(0.5, 1);
+    this.swordSprite.scale.set(PLAYER.radius * SPRITE_PER_RADIUS * 1.3);
+    this.swordSprite.visible = false;
 
     // One batched particle pool per enemy type (each its own sprite). Scale is
     // dynamic (vertex) so each enemy sizes to its radius and punches on hit.
@@ -224,6 +221,21 @@ export class Renderer {
     this.axeContainer = axe.container;
     this.axeParticles = axe.particles;
 
+    // Piercing Light: a glowing horizontal streak, rotated to travel direction and
+    // sized (vertex) to the ray's hitbox thickness. Additive blend reads as light.
+    const lightTex: Texture = this.app.renderer.generateTexture(
+      new Graphics().roundRect(-32, -4, 64, 8, 4).fill(0xffffff),
+    );
+    const light = this.buildParticlePool(
+      lightTex,
+      0x9fd8ff, // pale blue; additive over the dark floor reads white-hot at the core
+      PROJECTILE_CAPACITY,
+      { position: true, rotation: true, vertex: true },
+    );
+    this.lightContainer = light.container;
+    this.lightContainer.blendMode = "add";
+    this.lightParticles = light.particles;
+
     // XP gems: small bright diamonds-as-circles, one shared texture, tinted cyan.
     const gemTex: Texture = this.app.renderer.generateTexture(
       new Graphics().circle(0, 0, XP.gemRadius).fill(0xffffff),
@@ -244,31 +256,6 @@ export class Renderer {
     this.bossSprite.scale.set(BOSS.radius * SPRITE_PER_RADIUS);
     this.bossSprite.tint = BOSS.color;
     this.bossSprite.visible = false;
-
-    // Pooled whip wedges. Each draws the same sector once (apex at origin,
-    // pointing +x, spanning ±arcHalfAngle out to range). At swing time we just
-    // place + rotate + fade one.
-    for (let i = 0; i < WHIP_STRIKE_CAPACITY; i++) {
-      const g = new Graphics();
-      g.moveTo(0, 0)
-        .arc(0, 0, WHIP.range, -WHIP.arcHalfAngle, WHIP.arcHalfAngle)
-        .lineTo(0, 0)
-        .fill({ color: 0xbfe3ff, alpha: 0.22 });
-      g.visible = false;
-      this.whipGraphics.push(g);
-      this.whipLayer.addChild(g);
-    }
-
-    // Black Aura tendrils: each a thin violet line of unit length (pointing +x);
-    // per active tendril we scale x to its reach and fade by age. Additive glow.
-    for (let i = 0; i < TENDRIL_CAPACITY; i++) {
-      const g = new Graphics();
-      g.rect(0, -1.5, TENDRIL_BASE_LEN, 3).fill({ color: 0xcf6bff, alpha: 0.9 });
-      g.blendMode = "add";
-      g.visible = false;
-      this.tendrilGraphics.push(g);
-      this.tendrilLayer.addChild(g);
-    }
 
     // Laser beam, drawn once at the canonical aim (origin at the player, pointing +x,
     // length = range). Per active blast we just place + rotate + fade it — no geometry
@@ -294,6 +281,32 @@ export class Renderer {
         this.laserBeams.push(beam);
       }
     }
+
+    // Ultimate beam: the same layered glow→core build as the laser, but much wider and
+    // blue. Drawn once pointing +x at full range; per fire we place + fade it.
+    {
+      const half = ULTIMATE.width / 2;
+      const c = ULTIMATE.color;
+      this.ultBeam
+        .rect(0, -half * 1.4, ULTIMATE.range, half * 2.8)
+        .fill({ color: c.glow, alpha: 0.16 }) // soft outer glow
+        .rect(0, -half, ULTIMATE.range, half * 2)
+        .fill({ color: c.body, alpha: 0.45 }) // mid body
+        .rect(0, -half * 0.45, ULTIMATE.range, half * 0.9)
+        .fill({ color: c.core, alpha: 0.95 }) // white-blue core
+        .circle(0, 0, half * 1.4)
+        .fill({ color: 0xffffff, alpha: 0.7 }); // muzzle flare
+      this.ultBeam.blendMode = "add";
+      this.ultBeam.visible = false;
+    }
+
+    // Ultimate charge ring: drawn once at a base radius; per frame we scale it inward
+    // and brighten it as the charge fills (a "closing in" telegraph).
+    this.ultRing
+      .circle(0, 0, 60)
+      .stroke({ width: 5, color: 0x7fb8ff, alpha: 0.9 });
+    this.ultRing.blendMode = "add";
+    this.ultRing.visible = false;
 
     // Pre-render each digit 0-9 to a texture, once, in white and in crit-red.
     // Damage numbers are then composed from these — no per-number text layout.
@@ -322,23 +335,25 @@ export class Renderer {
       this.dnLayer.addChild(s);
     }
 
-    // Draw order: backdrop, garlic aura, swarm, whip arcs, projectiles, numbers,
-    // then gems near the top so the swarm + damage-number text don't bury them,
-    // player, and the level-up ring on top. The aura sits under the swarm.
-    this.world.addChild(floor, this.garlicAura);
+    // Draw order: backdrop, swarm, projectiles + light streaks, numbers, then gems
+    // near the top so the swarm + damage-number text don't bury them, the sword and
+    // player above that, and the level-up ring on top.
+    this.world.addChild(floor);
     for (const pool of this.enemyPools) this.world.addChild(pool.container);
     this.world.addChild(
       this.bossSprite,
-      this.whipLayer,
-      this.tendrilLayer,
       this.projContainer,
       this.axeContainer,
+      this.lightContainer,
       ...this.laserBeams,
+      this.ultBeam,
       this.dnLayer,
       this.gemContainer,
+      this.swordSprite,
       this.playerSprite,
       border,
       this.levelUpRing,
+      this.ultRing,
     );
     this.app.stage.addChild(this.world);
 
@@ -383,56 +398,32 @@ export class Renderer {
     // world (the side-scroller illusion). Keyed off sim-time → smooth and seek-safe.
     this.floor.tilePosition.x = -state.time * FLOOR_SCROLL_SPEED;
 
-    // Garlic aura follows the player; scales with the (upgradeable) radius and
-    // pulses its alpha to read as "active". The AoE passive multiplies the radius
-    // in gameplay (garlic.ts), so fold the same aoeMult in here to keep the disc
-    // matched to the actual damage range — both read state, no per-frame alloc.
-    this.garlicAura.visible = state.weapons.garlic.level >= 1; // hidden until acquired
-    this.garlicAura.position.set(p.pos.x, p.pos.y);
-    this.garlicAura.scale.set(
-      (state.weapons.garlic.radius * state.passives.aoeMult) / GARLIC.radius,
-    );
-    this.garlicAura.alpha = 0.75 + 0.25 * Math.sin(state.time * 4);
-    // Black Aura recolors the green disc to a dark violet.
-    this.garlicAura.tint = state.weapons.garlic.evolved ? 0xb84dff : 0xffffff;
+    // Sword: each swing sweeps the blade once across its arc over the weapon's
+    // cooldown, alternating direction (a real back-and-forth). The blade is anchored
+    // at the hilt and points forward (+x) at rest. It stays visible while a mob is in
+    // range OR while a sweep is still finishing — so a one-shot kill still shows a
+    // full, consistent swing instead of a single-frame flash.
+    {
+      const w = state.weapons.whip;
+      const cd =
+        (w.evolved ? WHIP.evo.cooldown : w.cooldown) / state.passives.fireRateMult;
+      const elapsed = state.time - state.swordSwingStart;
+      const swinging = elapsed < cd;
+      this.swordSprite.visible = state.swordActive || swinging;
+      if (this.swordSprite.visible) {
+        this.swordSprite.position.set(p.pos.x, p.pos.y);
+        const rest = Math.PI / 2; // hilt-anchored blade points +x (right) at rest
+        const t = swinging ? elapsed / cd : 1;
+        const eased = t * t * (3 - 2 * t); // smoothstep — accelerate then settle
+        const from = state.swordSwingDir ? -WHIP.swingArc : WHIP.swingArc;
+        const to = state.swordSwingDir ? WHIP.swingArc : -WHIP.swingArc;
+        this.swordSprite.rotation = rest + from + (to - from) * eased;
+      }
+    }
 
     this.syncEnemies(state.enemies);
 
     this.syncProjectiles(state.projectiles);
-
-    // Whip strikes: place/rotate/fade each active wedge; hide the rest. Reaper
-    // (evolved) keeps the wedge but scales it up to the extended reach.
-    const ws = state.whipStrikes;
-    const wg = this.whipGraphics;
-    const wn = ws.count;
-    const whipScale = state.weapons.whip.evolved ? WHIP.evo.range / WHIP.range : 1;
-    for (let i = 0; i < wn; i++) {
-      const g = wg[i]!;
-      g.position.set(ws.posX[i]!, ws.posY[i]!);
-      g.rotation = ws.angle[i]!;
-      g.scale.set(whipScale);
-      g.alpha = 1 - ws.age[i]! / WHIP.strikeTTL;
-      g.visible = true;
-    }
-    for (let i = wn; i < this.whipHigh; i++) wg[i]!.visible = false;
-    this.whipHigh = wn;
-
-    // Black Aura tendrils: place/rotate each line at its player end, scale x to its
-    // reach, fade by sim-time age. Hidden when garlic isn't evolved (none spawn).
-    const td = state.tendrils;
-    const tg = this.tendrilGraphics;
-    const tn = td.count;
-    const tInvTTL = 1 / GARLIC.evo.tendrilTTL;
-    for (let i = 0; i < tn; i++) {
-      const g = tg[i]!;
-      g.position.set(td.ox[i]!, td.oy[i]!);
-      g.rotation = td.angle[i]!;
-      g.scale.set(td.len[i]! / TENDRIL_BASE_LEN, 1);
-      g.alpha = 1 - (state.time - td.born[i]!) * tInvTTL;
-      g.visible = true;
-    }
-    for (let i = tn; i < this.tendrilHigh; i++) tg[i]!.visible = false;
-    this.tendrilHigh = tn;
 
     // Laser: while a blast is active, place/rotate/fade the live beam(s). The base
     // weapon shows one full-length beam along the locked heading; Prism draws its
@@ -469,6 +460,28 @@ export class Renderer {
       }
     } else {
       for (const beam of this.laserBeams) if (beam.visible) beam.visible = false;
+    }
+
+    // Ultimate beam: while firing, place it forward (+x) and fade the final 30%.
+    if (state.ultActive > 0) {
+      const f = state.ultActive / ULTIMATE.duration; // 1 → 0 over the blast
+      this.ultBeam.position.set(p.pos.x, p.pos.y);
+      this.ultBeam.rotation = 0; // forward — facing is locked right
+      this.ultBeam.alpha = f < 0.3 ? f / 0.3 : 1; // hold, then fade out
+      this.ultBeam.visible = true;
+    } else if (this.ultBeam.visible) {
+      this.ultBeam.visible = false;
+    }
+
+    // Ultimate charge ring: tighten + brighten as the charge fills (a slight pulse).
+    if (state.ultCharge > 0) {
+      const frac = Math.min(1, state.ultCharge / ULTIMATE.chargeTime);
+      this.ultRing.position.set(p.pos.x, p.pos.y);
+      this.ultRing.scale.set(2.6 - 1.6 * frac + 0.05 * Math.sin(state.time * 30));
+      this.ultRing.alpha = 0.25 + 0.65 * frac;
+      this.ultRing.visible = true;
+    } else if (this.ultRing.visible) {
+      this.ultRing.visible = false;
     }
 
     // XP gems: pooled particles, position-only.
@@ -628,6 +641,7 @@ export class Renderer {
   private syncProjectiles(pr: Projectiles): void {
     const daggerP = this.projParticles;
     const axeP = this.axeParticles;
+    const lightP = this.lightParticles;
     const posX = pr.posX;
     const posY = pr.posY;
     const velX = pr.velX;
@@ -638,6 +652,7 @@ export class Renderer {
     const n = pr.count;
     let dN = 0;
     let aN = 0;
+    let lN = 0;
     for (let i = 0; i < n; i++) {
       if (kind[i] === PROJ_AXE) {
         const p = axeP[aN++]!;
@@ -647,6 +662,15 @@ export class Renderer {
         const s = radius[i]! * SPRITE_PER_RADIUS; // size to this axe's radius
         p.scaleX = s;
         p.scaleY = s;
+      } else if (kind[i] === PROJ_LIGHT) {
+        const p = lightP[lN++]!;
+        p.x = posX[i]!;
+        p.y = posY[i]!;
+        p.rotation = Math.atan2(velY[i]!, velX[i]!); // streak points along travel
+        // The 64×8 streak texture: stretch it long and thin — a sliver of light.
+        // Thickness tracks the ray's hitbox radius (Reek/AoE visibly fatten it).
+        p.scaleX = 3.0; // ~190px streak
+        p.scaleY = radius[i]! / 22; // skinny (~5px at base)
       } else {
         const p = daggerP[dN++]!;
         p.x = posX[i]!;
@@ -664,8 +688,14 @@ export class Renderer {
       p.x = OFFSCREEN;
       p.y = OFFSCREEN;
     }
+    for (let i = lN; i < this.lightHigh; i++) {
+      const p = lightP[i]!;
+      p.x = OFFSCREEN;
+      p.y = OFFSCREEN;
+    }
     this.projHigh = dN;
     this.axeHigh = aN;
+    this.lightHigh = lN;
   }
 
   /**

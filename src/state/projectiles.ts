@@ -8,6 +8,7 @@ export const PROJECTILE_CAPACITY = 512;
 // Projectile kinds — drive gravity/despawn behavior and which visual pool draws it.
 export const PROJ_DAGGER = 0;
 export const PROJ_AXE = 1;
+export const PROJ_LIGHT = 2; // Piercing Light — reflects off top/bottom edges
 
 // Sentinel pierce: never consumed. The projectile passes through every enemy and
 // only ends by leaving the world (or lifetime). Used by axes.
@@ -27,7 +28,10 @@ export class Projectiles {
   readonly pierce: Int16Array; // remaining enemies it can pass through
   readonly gravity: Float32Array; // downward accel (px/s²); 0 = straight-line
   readonly spin: Float32Array; // current visual rotation (rad)
-  readonly kind: Uint8Array; // PROJ_DAGGER | PROJ_AXE
+  readonly kind: Uint8Array; // PROJ_DAGGER | PROJ_AXE | PROJ_LIGHT
+  // Bounces left before a PROJ_LIGHT ray stops reflecting off the top/bottom edges.
+  // Only meaningful for PROJ_LIGHT; the light weapon writes it after spawn().
+  readonly reflectionsLeft: Int8Array;
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -42,6 +46,7 @@ export class Projectiles {
     this.gravity = new Float32Array(capacity);
     this.spin = new Float32Array(capacity);
     this.kind = new Uint8Array(capacity);
+    this.reflectionsLeft = new Int8Array(capacity);
   }
 
   spawn(
@@ -69,6 +74,7 @@ export class Projectiles {
     this.gravity[i] = gravity;
     this.spin[i] = 0;
     this.kind[i] = kind;
+    this.reflectionsLeft[i] = 0; // PROJ_LIGHT overwrites this right after spawn
     return i;
   }
 
@@ -86,5 +92,6 @@ export class Projectiles {
     this.gravity[i] = this.gravity[last]!;
     this.spin[i] = this.spin[last]!;
     this.kind[i] = this.kind[last]!;
+    this.reflectionsLeft[i] = this.reflectionsLeft[last]!;
   }
 }

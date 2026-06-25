@@ -22,6 +22,7 @@ Enemies stream in from the right and the roster widens over time: fast **runners
 | Key | Action |
 |-----|--------|
 | `WASD` / arrows | Move |
+| `Space` (hold) | Charge the **Ultimate** — a 4s hold unleashes a wide beam that wipes the lane (boss immune) |
 | `Esc` | Pause / resume |
 | `1` `2` `3` | Choose an upgrade (on level-up) |
 | `R` | Restart (after death / victory) |
@@ -42,12 +43,12 @@ Enemies stream in from the right and the roster widens over time: fast **runners
 Each weapon was added because it forces a *new system* to exist:
 
 - **Dagger** — auto-fires at the nearest enemy. Pooled projectiles + spatial-hash targeting + collision. Upgrades fan out multiple.
-- **Whip** — a fixed-arc melee cleave. Non-projectile, area-overlap damage.
-- **Garlic** — a persistent aura. Per-enemy re-hit cooldown (the DoT cadence pattern).
+- **Sword** — a melee blade that swings only when a mob is within striking range, cleaving everything in a forward arc. Non-projectile, area-overlap damage.
+- **Piercing Light** — a fast ray fired at 45° toward the nearest enemy that reflects off the top/bottom edges (up to 5 bounces) and pierces everything it crosses.
 - **Axe** — a gravity projectile lobbed upward that arcs down through the swarm with infinite pierce.
 - **Laser** — a sustained beam fired downrange along your (locked-right) facing. A line-segment hitbox that pierces everything in the lane.
 
-At its 5th upgrade each weapon **evolves**: the Dagger becomes a fast triple-stream, the Whip a front/back cleave, Garlic a searing tendril-flicking aura, the Axe an outward spiral of giant blades, and the Laser a reflecting beam that splits and shrinks across the swarm.
+At its 5th upgrade each weapon **evolves**: the Dagger becomes a fast triple-stream, the Sword swings twice as fast with greater reach, Piercing Light fires both up and down with more bounces, the Axe an outward spiral of giant blades, and the Laser a reflecting beam that splits and shrinks across the swarm.
 
 Hits roll ±15% damage variance and a 15% / 2× crit (crits render larger and red).
 

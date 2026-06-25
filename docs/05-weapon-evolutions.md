@@ -7,7 +7,7 @@ The genre's signature progression hook. We already have the level-up menu, a
 flat upgrade pool, and one `update*()` system per weapon — evolutions add a
 per-weapon **level cap** and a powered-up firing branch. No new engine
 subsystems: every evolution reuses an existing hitbox shape (projectile pool,
-whip wedge, garlic disc, laser line-segment).
+sword forward-arc, reflecting light ray, laser line-segment).
 
 ## Locked decisions
 
@@ -66,8 +66,8 @@ Each is a branch inside the existing `update*()` system, keyed on
 |---|---|---|---|
 | Dagger | Thousand Fangs | Three parallel daggers forming a fast, fat row along facing; constant fire, no pierce | projectile pool |
 | Axe    | Cyclone        | 2 big, hard-hitting axes flung FORWARD (rightward) with a small fan + jitter, gravity off — infinite pierce + high damage cleaves through mobs | projectile pool; axe pool gains vertex scaling |
-| Garlic | Black Aura     | Larger radius, ~3× damage, faster re-tick; dark tint; flicks a tendril to each struck enemy per hit | garlic disc + `Tendrils` visual pool |
-| Whip   | Reaper         | Keeps the wedge but alternates the swing front → back → front on a faster cadence at extended reach | whip wedge (scaled up) |
+| Garlic | Refraction     | Fires BOTH the up and down light ray each shot, with more reflections, on a slightly faster cadence | projectile pool (PROJ_LIGHT) |
+| Whip   | Flurry         | Same proximity sword, swinging ~2× faster with greater strike range | sword sprite + forward-arc hitbox |
 | Laser  | Prism          | Same cadence as the base beam (on 1000ms, softer per tick). Unlike the base beam it does NOT run off screen: each beam stops at what it reflects off of, splits into two outer beams, and shrinks (shorter + thinner) each reflection — gone after 5 (a tree of segments in `state.laserSegments`) | laser line-segment, pooled beam Graphics scaled per segment |
 
 Names/numbers are placeholders — balance pass after the mechanic works.

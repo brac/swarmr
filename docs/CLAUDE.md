@@ -9,7 +9,8 @@ swarmr began as a top-down arena survivor and has since pivoted to a **side-scro
 What changed from the original top-down build:
 - **Spawn:** enemies enter only from the right edge; off-left-edge movers are culled.
 - **Movement:** per-enemy `MOVE_*` behavior — all spawn `STRAIGHT_LEFT`; the original `HOMING` seek is kept for future movement types.
-- **Weapons (5):** added **Laser** (sustained line-segment beam), and every weapon now **evolves** at its 5th upgrade pick (see `docs/05-weapon-evolutions.md`). **Garlic, Axe, and Whip are flagged for a side-scroller redesign** (they were designed for a top-down swarm — see `BACKLOG.md`).
+- **Weapons (5):** added **Laser** (sustained line-segment beam), and every weapon now **evolves** at its 5th upgrade pick (see `docs/05-weapon-evolutions.md`). The side-scroller redesigns of the top-down weapons are **done**: the **Axe** lobs forward across the lane; the **Whip** is now a melee **Sword** that swings only when a mob is in striking range, cleaving a forward arc; and **Garlic** is now **Piercing Light** — a fast ray fired at 45° toward the nearest enemy that reflects off the top/bottom edges (up to 5 bounces) on the projectile pool and pierces everything (the `garlic`/`whip` weapon ids are retained).
+- **Ultimate** (`systems/ultimate.ts`): hold **Space** for a 4s charge → a wide blue beam fires `+x` and instakills every mob in the band (boss immune). Reuses the laser's line-segment hit test (`hp=0` instead of rolling damage) and beam-Graphics render. Ungated for now; the passive/weapon combo unlock ("Ultimate trigger") is the next backlog item. Tunables in `data/ultimate.ts`.
 - **Swarm cap:** north-star count raised 2,000 → **2,500**.
 - **Dev menu** (backtick): set any weapon to base/+1/max/evolved and a live spawn-count slider.
 

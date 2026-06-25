@@ -24,6 +24,7 @@ import { updateWhip } from "./systems/weapons/whip";
 import { updateGarlic } from "./systems/weapons/garlic";
 import { updateAxe } from "./systems/weapons/axe";
 import { updateLaser } from "./systems/weapons/laser";
+import { updateUltimate } from "./systems/ultimate";
 import { updateProjectiles } from "./systems/projectiles";
 import { updateCollision } from "./systems/collision";
 import { updateGems } from "./systems/gems";
@@ -178,9 +179,10 @@ async function main(): Promise<void> {
       updateContact(state, dt); // enemies touching the player deal damage (i-frames)
       updateBoss(state, dt); // arrive at the deadline, seek, contact (before weapons)
       updateDagger(state, dt); // auto-fire at nearest enemy (queries the hash)
-      updateWhip(state, dt); // sweep an arc; area-overlap damage (before collision)
-      updateGarlic(state); // persistent aura; per-enemy re-hit cooldown (before collision)
+      updateWhip(state, dt); // sword: swing + forward-arc damage when a mob is in range (before collision)
+      updateGarlic(state, dt); // Piercing Light: launch reflecting rays on a cooldown
       updateLaser(state, dt); // sustained beam along player facing; line hitbox (before collision)
+      updateUltimate(state, input, dt); // hold-Space charge → wide instakill beam (before collision)
       updateAxe(state, dt); // lob gravity axes upward (pooled projectiles)
       updateProjectiles(state, dt); // travel + lifetime (gravity arcs the axes)
       updateCollision(state); // projectile↔enemy, damage, deaths, gem drops

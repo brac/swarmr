@@ -11,6 +11,15 @@ import { RAMP } from "../data/waves";
 
 const WEAPONS: WeaponId[] = ["dagger", "whip", "garlic", "axe", "laser"];
 
+// Player-facing weapon names (the internal ids stay "whip"/"garlic" — see CLAUDE.md).
+const WEAPON_NAMES: Record<WeaponId, string> = {
+  dagger: "Dagger",
+  whip: "Sword",
+  garlic: "Piercing Light",
+  axe: "Axe",
+  laser: "Laser",
+};
+
 interface DevActions {
   spawnBoss: () => void;
   levelUp: () => void;
@@ -187,7 +196,7 @@ export class DevMenu {
         : w.evolved
           ? "EVOLVED"
           : `Lv ${w.level}/${WEAPON_STAT_CAP}`;
-      label.textContent = `${wid.padEnd(7)} ${stage}`;
+      label.textContent = `${WEAPON_NAMES[wid].padEnd(14)} ${stage}`;
       label.style.color = !firing ? "#6c7689" : w.evolved ? "#ffd86b" : "#9fe0a0";
       row.appendChild(label);
 
