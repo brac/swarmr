@@ -15,7 +15,7 @@ The genre is light on rendering and heavy on entity throughput, so swarmr is bui
 3. **Each gem banks one upgrade** → pick one of three to shape your build. A weapon's 5th pick **evolves** it into a powered-up form (gold card).
 4. **Survive to 10:00**, then defeat the boss (it advances from the right too) to win.
 
-Enemies stream in from the right and get tougher over time: fast **runners** phase in around 0:25, heavy **tanks** around 1:15, and every enemy gains HP as the clock climbs.
+Enemies stream in from the right and the roster widens over time: fast **runners** (0:20) and **goblin** packs (1:00), heavy **tanks** (1:30), armored **biters** (3:00) and shelled **carapaces** (5:00). The two apex elites — the homing **hellhound** and the glass-cannon **serpent** — are held back until **7:00**, so the hardest mobs only show up late. Every enemy also gains HP as the clock climbs.
 
 ### Controls
 

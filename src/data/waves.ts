@@ -31,13 +31,21 @@ export const DIFFICULTY = {
   hpRampPerMin: 0.6, // +60% enemy HP per minute survived
 
   // Spawn-weight tiers by elapsed seconds. Each tier's `w` is the relative spawn
-  // weight per ENEMY_TYPES index [grunt, runner, tank]; the spawner uses the
-  // latest tier whose time has been reached. Early = all grunts; tougher types
-  // and tanks phase in as the run goes on.
+  // weight per ENEMY_TYPES index — order is:
+  //   [grunt, runner, tank, goblin, biter, carapace, hellhound, serpent]
+  // The spawner uses the latest tier whose time has been reached, so each row
+  // phases a new body into the mix. The run opens on grunts only; the mid-game
+  // roster widens through the first five minutes; the two APEX elites (hellhound,
+  // serpent — indices 6,7) stay at weight 0 until t:420 so the hardest mobs never
+  // appear before 7:00.
   tiers: [
-    { t: 0, w: [1, 0, 0] },
-    { t: 25, w: [0.7, 0.3, 0] },
-    { t: 75, w: [0.5, 0.3, 0.2] },
-    { t: 150, w: [0.35, 0.35, 0.3] },
+    { t: 0, w: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] }, // 0:00 — grunts only
+    { t: 20, w: [0.7, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] }, // 0:20 — + runners
+    { t: 60, w: [0.5, 0.3, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0] }, // 1:00 — + goblins (pack)
+    { t: 90, w: [0.42, 0.26, 0.12, 0.2, 0.0, 0.0, 0.0, 0.0] }, // 1:30 — + tanks
+    { t: 180, w: [0.34, 0.24, 0.12, 0.18, 0.12, 0.0, 0.0, 0.0] }, // 3:00 — + biters
+    { t: 300, w: [0.27, 0.21, 0.12, 0.16, 0.13, 0.11, 0.0, 0.0] }, // 5:00 — + carapace
+    { t: 420, w: [0.2, 0.18, 0.11, 0.13, 0.13, 0.11, 0.08, 0.06] }, // 7:00 — + ELITES
+    { t: 540, w: [0.16, 0.15, 0.11, 0.12, 0.13, 0.12, 0.11, 0.1] }, // 9:00 — elites ramp
   ],
 } as const;

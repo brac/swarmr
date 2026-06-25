@@ -51,7 +51,10 @@ const ATLAS_COLS = 12;
 const TILEMAP = "assets/Tilemap/tilemap_packed.png";
 const FLOOR_TILE = "assets/Tiles/tile_0048.png"; // standalone (no atlas-seam bleed)
 const T_PLAYER = 98;
-const T_ENEMY = [108, 122, 109]; // grunt=slime, runner=spider, tank=orc
+// One atlas tile per ENEMY_TYPES index (order is load-bearing — see data/enemies):
+// grunt=slime, runner=spider, tank=orc, goblin, biter=crab, carapace=beetle,
+// hellhound=red-eyed beast, serpent=coiled snake.
+const T_ENEMY = [108, 122, 109, 112, 110, 124, 111, 123];
 const T_BOSS = 121; // skull-wraith
 const T_DAGGER = 103;
 const T_AXE = 118;
@@ -81,6 +84,9 @@ export class Renderer {
     particles: Particle[];
     high: number;
   }[] = [];
+  // Per-frame write cursor into each enemy pool (one slot per type). Reused and
+  // zeroed each frame so routing the swarm by type allocates nothing.
+  private enemyCursors: number[] = [];
 
   // Projectile (Dagger) layer: same pooled-particle pattern, its own texture/tint.
   private projContainer!: ParticleContainer;
@@ -192,6 +198,7 @@ export class Renderer {
         { position: true, vertex: true },
       );
       this.enemyPools.push({ ...pool, high: 0 });
+      this.enemyCursors.push(0);
     }
 
     // Dagger projectiles: sprite that rotates to face travel (rotation dynamic).
@@ -581,7 +588,8 @@ export class Renderer {
     const type = e.type;
     const reactInv = 1 / ENEMY.hitReactTime;
     const wobble = ENEMY.hitWobble;
-    const cursors = [0, 0, 0];
+    const cursors = this.enemyCursors;
+    cursors.fill(0);
 
     for (let i = 0; i < count; i++) {
       const pool = pools[type[i]!]!;
