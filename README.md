@@ -131,6 +131,11 @@ Targets, held at the 2,000-enemy count:
 
 A live overlay (top-left) shows fps, logic/render ms, tick count, and enemy count.
 
+## Credits
+
+- **Sprites** — 16×16 tile atlas from [Kenney](https://kenney.nl) (public-domain / CC0 game assets).
+- **Sound effects** — procedurally synthesized in-repo via `scripts/gen-sounds.mjs`.
+
 ## License
 
-Private project, unlicensed. Ask before reusing.
+No license — all rights reserved. The source is public to read, but ask before reusing.
